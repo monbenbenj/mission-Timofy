@@ -1,0 +1,561 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Niveau 3 - La Suite Logique</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;700;900&display=swap" rel="stylesheet">
+    
+    <style>
+        body {
+            font-family: 'Nunito', sans-serif;
+            background-color: #f8fafc;
+            background-image: repeating-linear-gradient(45deg, #f1f5f9 25%, transparent 25%, transparent 75%, #f1f5f9 75%, #f1f5f9), repeating-linear-gradient(45deg, #f1f5f9 25%, #f8fafc 25%, #f8fafc 75%, #f1f5f9 75%, #f1f5f9);
+            background-position: 0 0, 10px 10px;
+            background-size: 20px 20px;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow-x: hidden;
+        }
+
+        /* Animations */
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-8px) rotate(-3deg); }
+            75% { transform: translateX(8px) rotate(3deg); }
+        }
+        .error-shake {
+            animation: shake 0.4s ease-in-out;
+            background-color: #fee2e2 !important;
+            border-color: #ef4444 !important;
+            color: #b91c1c !important;
+        }
+
+        @keyframes popIn {
+            0% { transform: scale(0.8); opacity: 0; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+        .animate-pop { animation: popIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
+
+        @keyframes trainEnter {
+            0% { transform: translateX(100vw); }
+            100% { transform: translateX(0); }
+        }
+        .train-enter { animation: trainEnter 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) forwards; }
+
+        @keyframes trainLeave {
+            0% { transform: translateX(0); }
+            100% { transform: translateX(-100vw); }
+        }
+        .train-leave { animation: trainLeave 0.5s cubic-bezier(0.8, 0.2, 1, 0.2) forwards; }
+
+        /* Style du train */
+        .wagon {
+            position: relative;
+            border-radius: 12px 12px 4px 4px;
+            border-bottom-width: 4px;
+            transition: all 0.2s;
+        }
+        .wagon::after, .wagon::before {
+            content: '';
+            position: absolute;
+            bottom: -10px;
+            width: 16px;
+            height: 16px;
+            background-color: #334155;
+            border: 3px solid #cbd5e1;
+            border-radius: 50%;
+        }
+        .wagon::before { left: 10%; }
+        .wagon::after { right: 10%; }
+        
+        .wagon-link {
+            position: absolute;
+            right: -16px;
+            top: 50%;
+            width: 16px;
+            height: 6px;
+            background-color: #64748b;
+            transform: translateY(-50%);
+            z-index: -1;
+        }
+
+        .wagon-empty {
+            border: 3px dashed #94a3b8;
+            background-color: rgba(241, 245, 249, 0.8);
+            border-radius: 12px;
+        }
+        
+        /* Drag & Drop Styles */
+        .draggable-option { cursor: grab; user-select: none; }
+        .draggable-option:active { cursor: grabbing; }
+        .drag-over {
+            background-color: #e0f2fe !important;
+            border-color: #3b82f6 !important;
+            transform: scale(1.05);
+        }
+        .selected-option {
+            box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.5);
+            transform: scale(1.05);
+            border-color: #3b82f6;
+        }
+
+        /* La Mèche (Timer) */
+        #fuse-container { position: relative; }
+        #flame {
+            position: absolute;
+            right: -15px;
+            top: -10px;
+            font-size: 24px;
+            transition: transform 0.1s linear;
+            text-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        }
+        .time-bonus { color: #22c55e; position: absolute; font-weight: black; animation: popUp 1s forwards; pointer-events: none;}
+        .time-penalty { color: #ef4444; position: absolute; font-weight: black; animation: popUp 1s forwards; pointer-events: none;}
+        
+        @keyframes popUp {
+            0% { transform: translateY(0) scale(1); opacity: 1; }
+            100% { transform: translateY(-30px) scale(1.5); opacity: 0; }
+        }
+    </style>
+</head>
+<body>
+
+    <header class="bg-white/90 backdrop-blur-md shadow-sm p-4 sticky top-0 z-20">
+        <div class="max-w-4xl mx-auto flex justify-between items-center">
+            <h1 class="text-xl md:text-2xl font-black text-gray-800 flex items-center gap-2">
+                <span class="text-3xl">🧩</span> La Suite Logique
+            </h1>
+            <div class="flex items-center gap-4">
+                <div class="bg-gray-100 px-4 py-2 rounded-xl font-bold text-gray-600 shadow-inner">
+                    Série <span id="score-indicator" class="text-blue-500 font-black text-lg">0</span> / 20
+                </div>
+                <button onclick="window.location.href='index.html'" class="text-gray-400 hover:text-red-500 transition font-bold text-sm bg-gray-50 px-3 py-2 rounded-lg border border-gray-200">
+                    Quitter
+                </button>
+            </div>
+        </div>
+        
+        <!-- Jauge du Chrono (La Mèche) -->
+        <div class="max-w-xl mx-auto mt-6" id="fuse-container">
+            <div class="bg-gray-800 h-3 rounded-full w-full relative shadow-inner">
+                <div id="fuse-bar" class="h-full rounded-full w-full transition-all duration-100 ease-linear flex items-center relative" style="background-color: #22c55e;">
+                    <span id="flame">🔥</span>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <main class="flex-grow flex flex-col items-center justify-center p-4 overflow-hidden relative">
+        <div class="w-full max-w-4xl">
+            
+            <p class="text-center text-gray-500 font-bold mb-10 text-sm md:text-base">
+                Glisse ou tapote l'étiquette manquante pour compléter le train avant la fin du temps !
+            </p>
+
+            <!-- Le Train -->
+            <div id="train-container" class="flex flex-wrap md:flex-nowrap justify-center items-center gap-4 md:gap-6 mb-16 train-enter min-h-[80px]">
+                <!-- Les wagons seront générés ici -->
+            </div>
+
+            <!-- Ligne de chemin de fer (décorative) -->
+            <div class="w-full h-2 bg-gray-300 rounded-full mx-auto max-w-2xl mb-12 shadow-inner"></div>
+
+            <!-- Boîte à mots (Options) -->
+            <div class="bg-white p-6 rounded-3xl shadow-lg border-4 border-gray-100 max-w-2xl mx-auto">
+                <h3 class="text-center font-black text-gray-400 uppercase tracking-widest text-xs mb-4">Étiquettes disponibles</h3>
+                <div id="options-container" class="flex flex-wrap justify-center gap-4">
+                    <!-- Les étiquettes seront générées ici -->
+                </div>
+            </div>
+
+        </div>
+    </main>
+
+    <!-- Modal Game Over -->
+    <div id="gameover-modal" class="fixed inset-0 bg-gray-900/80 backdrop-blur-sm hidden items-center justify-center z-50 p-4">
+        <div class="bg-white rounded-3xl p-8 max-w-sm w-full text-center shadow-2xl animate-pop">
+            <div class="text-6xl mb-4">💥</div>
+            <h3 class="text-2xl font-black text-gray-800 mb-2">Temps écoulé !</h3>
+            <p class="text-gray-600 mb-6 font-bold">La mèche a entièrement brûlé. Mais ce n'est pas grave, on recommence !</p>
+            <button onclick="startGame()" class="w-full bg-blue-500 text-white font-black py-4 rounded-xl shadow-lg hover:bg-blue-600 transition-all">
+                Réessayer 🔄
+            </button>
+        </div>
+    </div>
+
+    <!-- Modal Victoire -->
+    <div id="victory-modal" class="fixed inset-0 bg-gray-900/80 backdrop-blur-md hidden items-center justify-center z-50 p-4">
+        <div class="bg-gradient-to-br from-yellow-400 to-orange-500 rounded-3xl p-8 max-w-md w-full text-center shadow-2xl animate-pop border-4 border-white/30">
+            <div class="text-7xl mb-4 animate-bounce">🏆</div>
+            <h3 class="text-3xl font-black text-white mb-2">Série Validée !</h3>
+            <p id="victory-message" class="text-yellow-100 mb-8 font-bold text-lg">20/20 ! Tu maîtrises parfaitement l'ordre chronologique !</p>
+            <button onclick="finishLevel()" class="w-full bg-white text-orange-600 font-black text-xl py-4 rounded-xl shadow-xl hover:shadow-2xl hover:scale-105 transition-all">
+                Retour au Menu Principal
+            </button>
+        </div>
+    </div>
+
+    <!-- Menu Démarrer (Bloque le timer tant que non cliqué pour autoriser l'audio) -->
+    <div id="start-modal" class="fixed inset-0 bg-gray-900/90 backdrop-blur-md flex items-center justify-center z-50 p-4">
+        <div class="bg-white rounded-3xl p-8 max-w-sm w-full text-center shadow-2xl animate-pop">
+            <div class="text-6xl mb-4">⏱️</div>
+            <h3 class="text-2xl font-black text-gray-800 mb-2">Prêt Timofy ?</h3>
+            <p class="text-gray-600 mb-6 font-bold text-sm">Complète 20 trains de suite. Attention au chrono : une bonne réponse donne du temps, une erreur en enlève !</p>
+            <button onclick="initApp()" class="w-full bg-green-500 text-white font-black py-4 rounded-xl shadow-lg hover:bg-green-600 hover:-translate-y-1 transition-all">
+                C'est parti ! 🚀
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // --- Données du jeu ---
+        const dataSets = [
+            { id: 'daysEN', items: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'], lang: 'EN', optionsCount: 3, theme: 'bg-blue-100 text-blue-800 border-blue-400' },
+            { id: 'daysDE', items: ['Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag', 'Sonntag'], lang: 'DE', optionsCount: 3, theme: 'bg-red-100 text-red-800 border-red-400' },
+            { id: 'monthsEN', items: ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'], lang: 'EN', optionsCount: 4, theme: 'bg-blue-100 text-blue-800 border-blue-400' },
+            { id: 'monthsDE', items: ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'], lang: 'DE', optionsCount: 4, theme: 'bg-red-100 text-red-800 border-red-400' }
+        ];
+
+        // --- Variables d'état ---
+        let score = 0;
+        const maxScore = 20;
+        const totalTimeInit = 30; // 30 secondes au départ
+        const maxTime = 45; // Plafond maximum du timer (barre à 100%)
+        let timeLeft = 0;
+        let timerInterval;
+        let currentMissingWord = "";
+        let isProcessing = false;
+        let selectedElement = null; // Pour le mode clic (mobile)
+
+        // Synthesizer Audio (Tone.js)
+        let synth;
+
+        // Elements DOM
+        const fuseBar = document.getElementById('fuse-bar');
+        const scoreIndicator = document.getElementById('score-indicator');
+        const trainContainer = document.getElementById('train-container');
+        const optionsContainer = document.getElementById('options-container');
+        const fuseContainer = document.getElementById('fuse-container');
+
+        async function initApp() {
+            // Initialiser Tone.js au premier clic de l'utilisateur
+            await Tone.start();
+            synth = new Tone.PolySynth(Tone.Synth).toDestination();
+            synth.volume.value = -10;
+
+            document.getElementById('start-modal').classList.add('hidden');
+            document.getElementById('start-modal').classList.remove('flex');
+            
+            startGame();
+        }
+
+        function playSound(type) {
+            if (!synth) return;
+            const now = Tone.now();
+            if (type === 'success') {
+                synth.triggerAttackRelease("C5", "16n", now);
+                synth.triggerAttackRelease("E5", "16n", now + 0.1);
+                synth.triggerAttackRelease("G5", "8n", now + 0.2);
+            } else if (type === 'error') {
+                synth.triggerAttackRelease("D#3", "8n", now);
+                synth.triggerAttackRelease("C3", "4n", now + 0.15);
+            } else if (type === 'timeout') {
+                synth.triggerAttackRelease("G2", "2n", now);
+                synth.triggerAttackRelease("C2", "1n", now + 0.3);
+            }
+        }
+
+        function showTimeFloater(amount, isPositive) {
+            const floater = document.createElement('div');
+            floater.innerText = isPositive ? `+${amount}s` : `${amount}s`;
+            floater.className = isPositive ? 'time-bonus' : 'time-penalty';
+            
+            // Position au centre en haut
+            floater.style.left = '50%';
+            floater.style.top = '60px';
+            
+            document.body.appendChild(floater);
+            setTimeout(() => floater.remove(), 1000);
+        }
+
+        function startGame() {
+            document.getElementById('gameover-modal').classList.add('hidden');
+            document.getElementById('gameover-modal').classList.remove('flex');
+            
+            score = 0;
+            scoreIndicator.innerText = score;
+            timeLeft = totalTimeInit;
+            isProcessing = false;
+            
+            updateTimerDisplay();
+            generateSequence();
+            
+            clearInterval(timerInterval);
+            timerInterval = setInterval(timerTick, 100); // Mise à jour toutes les 100ms pour fluidité
+        }
+
+        function timerTick() {
+            if (isProcessing) return; // Le temps s'arrête pendant les animations
+
+            timeLeft -= 0.1; // Retire 100ms
+            updateTimerDisplay();
+
+            if (timeLeft <= 0) {
+                clearInterval(timerInterval);
+                timeLeft = 0;
+                updateTimerDisplay();
+                handleGameOver();
+            }
+        }
+
+        function updateTimerDisplay() {
+            // Empêche la jauge de dépasser 100%
+            const cappedTime = Math.min(timeLeft, maxTime);
+            const percentage = Math.max(0, (cappedTime / maxTime) * 100);
+            
+            fuseBar.style.width = `${percentage}%`;
+
+            // Changement de couleur dynamique
+            if (percentage > 50) fuseBar.style.backgroundColor = '#22c55e'; // Vert
+            else if (percentage > 20) fuseBar.style.backgroundColor = '#eab308'; // Jaune
+            else fuseBar.style.backgroundColor = '#ef4444'; // Rouge
+        }
+
+        function generateSequence() {
+            isProcessing = true;
+            selectedElement = null; // Reset selection
+
+            // Animation de départ de l'ancien train
+            if (trainContainer.innerHTML !== "") {
+                trainContainer.classList.remove('train-enter');
+                trainContainer.classList.add('train-leave');
+            }
+
+            setTimeout(() => {
+                trainContainer.innerHTML = '';
+                optionsContainer.innerHTML = '';
+                trainContainer.classList.remove('train-leave');
+                trainContainer.classList.add('train-enter');
+
+                // 1. Choisir un set de données selon la progression
+                let availableSets;
+                if (score < 10) {
+                    // Séries 1 à 10 (score de 0 à 9) : Uniquement les jours
+                    availableSets = [dataSets[0], dataSets[1]];
+                } else {
+                    // Séries 11 à 20 (score de 10 à 19) : Uniquement les mois
+                    availableSets = [dataSets[2], dataSets[3]];
+                }
+                const set = availableSets[Math.floor(Math.random() * availableSets.length)];
+                
+                // 2. Générer la suite de 4
+                const sequenceLength = 4;
+                const startIndex = Math.floor(Math.random() * set.items.length);
+                const sequence = [];
+                for (let i = 0; i < sequenceLength; i++) {
+                    // Utilisation du modulo pour boucler (ex: Décembre -> Janvier)
+                    sequence.push(set.items[(startIndex + i) % set.items.length]);
+                }
+
+                // 3. Choisir l'élément manquant (wagon vide)
+                const missingIndex = Math.floor(Math.random() * sequenceLength);
+                currentMissingWord = sequence[missingIndex];
+
+                // 4. Créer les distracteurs (mauvaises réponses)
+                const options = [currentMissingWord];
+                while (options.length < set.optionsCount) {
+                    const randomWord = set.items[Math.floor(Math.random() * set.items.length)];
+                    if (!options.includes(randomWord)) {
+                        options.push(randomWord);
+                    }
+                }
+                
+                // Mélanger les options
+                options.sort(() => Math.random() - 0.5);
+
+                // 5. Rendu du Train
+                sequence.forEach((word, index) => {
+                    const wagon = document.createElement('div');
+                    
+                    if (index === missingIndex) {
+                        // Wagon vide (Drop Target)
+                        wagon.className = `wagon-empty w-24 h-16 md:w-32 md:h-20 flex items-center justify-center relative`;
+                        wagon.id = "empty-wagon";
+                        
+                        // Événements pour le Drag & Drop (PC)
+                        wagon.addEventListener('dragover', (e) => { e.preventDefault(); wagon.classList.add('drag-over'); });
+                        wagon.addEventListener('dragleave', () => wagon.classList.remove('drag-over'));
+                        wagon.addEventListener('drop', handleDrop);
+                        
+                        // Événement pour le Click (Mobile)
+                        wagon.addEventListener('click', handleTargetClick);
+
+                    } else {
+                        // Wagon plein
+                        wagon.className = `wagon ${set.theme} w-24 h-16 md:w-32 md:h-20 border-2 font-black flex items-center justify-center text-sm md:text-lg shadow-md`;
+                        wagon.innerText = word;
+                    }
+                    
+                    // Ajout du lien entre les wagons (sauf le dernier)
+                    if (index < sequenceLength - 1) {
+                        const link = document.createElement('div');
+                        link.className = 'wagon-link';
+                        wagon.appendChild(link);
+                    }
+                    
+                    trainContainer.appendChild(wagon);
+                });
+
+                // 6. Rendu des options
+                options.forEach(word => {
+                    const btn = document.createElement('button');
+                    btn.className = `draggable-option bg-white border-2 border-gray-300 text-gray-700 font-black text-sm md:text-lg py-3 px-6 rounded-xl shadow-sm hover:shadow-md transition-transform transform active:scale-95`;
+                    btn.innerText = word;
+                    btn.draggable = true;
+                    btn.dataset.word = word;
+                    
+                    // Events Drag & Drop
+                    btn.addEventListener('dragstart', (e) => {
+                        e.dataTransfer.setData('text/plain', word);
+                        btn.style.opacity = '0.5';
+                    });
+                    btn.addEventListener('dragend', () => {
+                        btn.style.opacity = '1';
+                    });
+
+                    // Event Click (Mobile)
+                    btn.addEventListener('click', () => handleOptionClick(btn));
+
+                    optionsContainer.appendChild(btn);
+                });
+
+                isProcessing = false;
+
+            }, trainContainer.innerHTML === "" ? 0 : 500); // Attendre la fin de l'animation de sortie si nécessaire
+        }
+
+        // Logique "Clic" (Pour les écrans tactiles)
+        function handleOptionClick(btn) {
+            if (isProcessing) return;
+            
+            // Retirer la sélection précédente
+            if (selectedElement) selectedElement.classList.remove('selected-option');
+            
+            // Sélectionner le nouveau
+            selectedElement = btn;
+            btn.classList.add('selected-option');
+        }
+
+        function handleTargetClick() {
+            if (isProcessing || !selectedElement) return;
+            const word = selectedElement.dataset.word;
+            verifyAnswer(word, selectedElement);
+        }
+
+        // Logique "Drag & Drop" (Pour les ordis)
+        function handleDrop(e) {
+            e.preventDefault();
+            const emptyWagon = document.getElementById('empty-wagon');
+            emptyWagon.classList.remove('drag-over');
+            
+            if (isProcessing) return;
+
+            const word = e.dataTransfer.getData('text/plain');
+            
+            // Retrouver le bouton HTML correspondant
+            const allOptions = Array.from(document.querySelectorAll('.draggable-option'));
+            const sourceBtn = allOptions.find(btn => btn.dataset.word === word);
+            
+            if (sourceBtn) {
+                verifyAnswer(word, sourceBtn);
+            }
+        }
+
+        function verifyAnswer(word, htmlElement) {
+            isProcessing = true;
+
+            if (word === currentMissingWord) {
+                // BONNE RÉPONSE
+                playSound('success');
+                
+                // Animation de l'étiquette allant dans le wagon
+                const emptyWagon = document.getElementById('empty-wagon');
+                emptyWagon.classList.remove('wagon-empty');
+                
+                // On récupère le thème de la série en cours en regardant les classes des autres wagons
+                const firstFilledWagon = Array.from(document.querySelectorAll('.wagon')).find(w => w.id !== 'empty-wagon');
+                if (firstFilledWagon) {
+                    emptyWagon.className = firstFilledWagon.className; 
+                    emptyWagon.querySelector('.wagon-link')?.remove(); // nettoyer si besoin, bien que link soit géré différemment
+                }
+                
+                emptyWagon.innerText = word;
+                emptyWagon.classList.add('animate-pop');
+                htmlElement.style.visibility = 'hidden';
+
+                // Gestion du score et temps
+                score++;
+                scoreIndicator.innerText = score;
+                timeLeft += 5; // Bonus
+                showTimeFloater(5, true);
+                updateTimerDisplay();
+
+                setTimeout(() => {
+                    if (score >= maxScore) {
+                        handleVictory();
+                    } else {
+                        generateSequence();
+                    }
+                }, 1000);
+
+            } else {
+                // MAUVAISE RÉPONSE
+                playSound('error');
+                htmlElement.classList.remove('selected-option');
+                htmlElement.classList.add('error-shake');
+                
+                timeLeft -= 3; // Pénalité
+                showTimeFloater(-3, false);
+                updateTimerDisplay();
+
+                setTimeout(() => {
+                    htmlElement.classList.remove('error-shake');
+                    selectedElement = null;
+                    if (timeLeft > 0) isProcessing = false;
+                }, 400);
+            }
+        }
+
+        function handleGameOver() {
+            playSound('timeout');
+            document.getElementById('gameover-modal').classList.remove('hidden');
+            document.getElementById('gameover-modal').classList.add('flex');
+        }
+
+        function handleVictory() {
+            clearInterval(timerInterval);
+            
+            const msgEl = document.getElementById('victory-message');
+            if (timeLeft > 20) {
+                msgEl.innerText = "20/20 ! Des réflexes fulgurants ! Ton cerveau fonctionne très vite.";
+            } else {
+                msgEl.innerText = "20/20 ! C'était juste avec le chrono, mais tu as tenu bon face à la pression !";
+            }
+
+            document.getElementById('victory-modal').classList.remove('hidden');
+            document.getElementById('victory-modal').classList.add('flex');
+        }
+
+        function finishLevel() {
+            // Débloque le niveau 4 dans le menu
+            localStorage.setItem('timofy_progress', '4');
+            window.location.href = 'index.html';
+        }
+
+    </script>
+</body>
+</html>

@@ -1,0 +1,481 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Niveau 5 - Le Défi Final</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;700;900&display=swap" rel="stylesheet">
+    
+    <style>
+        body {
+            font-family: 'Nunito', sans-serif;
+            background-color: #0f172a; /* Thème sombre pour le boss de fin */
+            background-image: 
+                radial-gradient(circle at 15% 50%, rgba(59, 130, 246, 0.15), transparent 25%),
+                radial-gradient(circle at 85% 30%, rgba(239, 68, 68, 0.15), transparent 25%);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            color: white;
+        }
+
+        /* Animations */
+        @keyframes popIn {
+            0% { transform: scale(0.9); opacity: 0; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+        .animate-pop { animation: popIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
+
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-5px) rotate(-1deg); }
+            75% { transform: translateX(5px) rotate(1deg); }
+        }
+        .error-shake { animation: shake 0.4s ease-in-out; }
+
+        @keyframes pulse-ring {
+            0% { box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.7); }
+            70% { box-shadow: 0 0 0 15px rgba(255, 255, 255, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(255, 255, 255, 0); }
+        }
+        .playing-audio { animation: pulse-ring 1s infinite; }
+
+        /* Styles spécifiques au champ de texte */
+        #word-input {
+            text-align: center;
+            font-weight: 900;
+            letter-spacing: 2px;
+            caret-color: #3b82f6;
+        }
+        #word-input:focus {
+            outline: none;
+            box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.5);
+        }
+        
+        /* Boutons accents allemands */
+        .accent-btn {
+            transition: all 0.1s;
+        }
+        .accent-btn:active {
+            transform: scale(0.9);
+            background-color: #cbd5e1;
+        }
+    </style>
+</head>
+<body>
+
+    <header class="bg-slate-900/80 backdrop-blur-md shadow-lg p-4 sticky top-0 z-20 border-b border-slate-700">
+        <div class="max-w-3xl mx-auto flex justify-between items-center">
+            <h1 class="text-xl md:text-2xl font-black text-white flex items-center gap-2">
+                <span class="text-3xl">⌨️</span> L'Ultime Défi
+            </h1>
+            <div class="flex items-center gap-4">
+                <div class="bg-slate-800 px-4 py-2 rounded-xl font-bold text-slate-300 shadow-inner border border-slate-600">
+                    Mot <span id="word-indicator" class="text-blue-400 font-black text-lg">1</span> / 20
+                </div>
+                <button onclick="window.location.href='index.html'" class="text-slate-400 hover:text-red-400 transition font-bold text-sm bg-slate-800 px-3 py-2 rounded-lg border border-slate-600">
+                    Fuite
+                </button>
+            </div>
+        </div>
+        
+        <!-- Score Bar globale -->
+        <div class="max-w-3xl mx-auto mt-4 bg-slate-800 rounded-full h-2 overflow-hidden shadow-inner">
+            <div id="progress-bar" class="bg-gradient-to-r from-blue-500 to-purple-500 h-full rounded-full w-0 transition-all duration-500 ease-out"></div>
+        </div>
+    </header>
+
+    <main class="flex-grow flex flex-col items-center justify-center p-4">
+        
+        <div class="bg-slate-800 p-6 md:p-8 rounded-3xl shadow-2xl max-w-xl w-full text-center relative border border-slate-700">
+            
+            <!-- Le Chronomètre visuel (15s) -->
+            <div class="absolute top-0 left-0 w-full h-2 bg-slate-700 rounded-t-3xl overflow-hidden">
+                <div id="timer-bar" class="h-full w-full bg-green-400 transition-all duration-100 ease-linear"></div>
+            </div>
+
+            <!-- Bouton Écouter & Drapeau -->
+            <div class="flex flex-col items-center justify-center mb-8 mt-4">
+                <div id="flag-display" class="text-6xl mb-4 drop-shadow-lg transition-transform transform hover:scale-110">🇬🇧</div>
+                <p id="lang-text" class="text-slate-400 font-bold uppercase tracking-widest text-sm mb-6">Anglais</p>
+                
+                <button id="btn-replay" class="flex items-center justify-center w-20 h-20 bg-blue-500 text-white rounded-full shadow-lg border-4 border-blue-400 transition-all active:scale-95 hover:bg-blue-600">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M11 5L6 9H2v6h4l5 4V5z" /></svg>
+                </button>
+                <p class="text-slate-500 text-xs font-bold mt-2">Réécouter</p>
+            </div>
+
+            <!-- Barre d'accents (Visible uniquement pour l'Allemand) -->
+            <div id="german-accents" class="hidden flex justify-center gap-2 mb-3">
+                <button class="accent-btn bg-slate-600 hover:bg-slate-500 text-white font-black text-xl w-10 h-10 rounded-lg shadow-sm border border-slate-500">ä</button>
+                <button class="accent-btn bg-slate-600 hover:bg-slate-500 text-white font-black text-xl w-10 h-10 rounded-lg shadow-sm border border-slate-500">ö</button>
+                <button class="accent-btn bg-slate-600 hover:bg-slate-500 text-white font-black text-xl w-10 h-10 rounded-lg shadow-sm border border-slate-500">ü</button>
+                <button class="accent-btn bg-slate-600 hover:bg-slate-500 text-white font-black text-xl w-10 h-10 rounded-lg shadow-sm border border-slate-500">ß</button>
+            </div>
+
+            <!-- Champ de saisie -->
+            <form id="word-form" class="flex flex-col gap-4 w-full">
+                <input type="text" id="word-input" autocomplete="off" autocorrect="off" spellcheck="false" placeholder="Tape le mot ici..." class="w-full bg-slate-900 border-2 border-slate-600 text-white text-2xl md:text-3xl py-4 px-6 rounded-2xl shadow-inner placeholder-slate-600">
+                
+                <button type="submit" id="btn-submit" class="w-full bg-gradient-to-r from-blue-500 to-indigo-600 text-white font-black text-xl py-4 rounded-xl shadow-lg hover:shadow-xl hover:-translate-y-1 transition-all">
+                    Valider (Entrée)
+                </button>
+            </form>
+
+            <!-- Retour d'information (Feedback Intelligent) -->
+            <div class="h-16 mt-6 flex items-center justify-center">
+                <p id="feedback-text" class="text-sm md:text-base font-bold opacity-0 transition-opacity px-4 py-2 rounded-xl"></p>
+            </div>
+
+        </div>
+    </main>
+
+    <!-- Modal de Départ -->
+    <div id="start-modal" class="fixed inset-0 bg-slate-900/95 backdrop-blur-md flex items-center justify-center z-50 p-4">
+        <div class="bg-white rounded-3xl p-8 max-w-md w-full text-center shadow-2xl border-b-8 border-indigo-500 animate-pop text-slate-800">
+            <div class="text-6xl mb-4">🎓</div>
+            <h3 class="text-2xl font-black mb-2">La Dictée Finale</h3>
+            <div class="text-slate-600 mb-6 text-sm font-bold text-left bg-slate-50 p-4 rounded-xl border border-slate-200">
+                <p class="mb-2">Le test ultime de Timofy :</p>
+                <ul class="list-disc pl-5 space-y-1">
+                    <li>Écoute le mot et regarde le drapeau.</li>
+                    <li>Écris exactement ce que tu entends.</li>
+                    <li class="text-red-500">Attention à la majuscule obligatoire pour tous les jours et mois !</li>
+                    <li>Tu as <strong>15 secondes</strong> par mot.</li>
+                </ul>
+            </div>
+            <button onclick="initGame()" class="w-full bg-indigo-600 text-white font-black py-4 rounded-xl shadow-lg hover:bg-indigo-700 transition-all">
+                Démarrer l'examen 🚀
+            </button>
+        </div>
+    </div>
+
+    <!-- Modal Fin de Jeu -->
+    <div id="end-modal" class="fixed inset-0 bg-slate-900/95 backdrop-blur-md hidden items-center justify-center z-50 p-4">
+        <div id="end-card" class="bg-white rounded-3xl p-8 max-w-md w-full text-center shadow-2xl animate-pop text-slate-800">
+            <div id="end-icon" class="text-7xl mb-4">🏆</div>
+            <h3 id="end-title" class="text-3xl font-black mb-2">Résultat</h3>
+            <p id="end-score" class="text-2xl font-black text-indigo-600 mb-2">15 / 20</p>
+            <p id="end-message" class="text-slate-600 mb-8 font-bold text-lg"></p>
+            
+            <div class="flex gap-4">
+                <button id="btn-retry" onclick="location.reload()" class="flex-1 bg-slate-200 text-slate-700 font-black py-3 rounded-xl hover:bg-slate-300 transition-all hidden">
+                    Réessayer
+                </button>
+                <button onclick="finishLevel()" class="flex-1 bg-gradient-to-r from-green-400 to-green-600 text-white font-black py-3 rounded-xl shadow-lg hover:scale-105 transition-all">
+                    Menu Principal
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- Données linguistiques (Les Jumeaux) ---
+        const pairsData = [
+            // Jours
+            { en: 'Monday', de: 'Montag' }, { en: 'Tuesday', de: 'Dienstag' },
+            { en: 'Wednesday', de: 'Mittwoch' }, { en: 'Thursday', de: 'Donnerstag' },
+            { en: 'Friday', de: 'Freitag' }, { en: 'Saturday', de: 'Samstag' }, { en: 'Sunday', de: 'Sonntag' },
+            // Mois
+            { en: 'January', de: 'Januar' }, { en: 'February', de: 'Februar' }, { en: 'March', de: 'März' },
+            { en: 'April', de: 'April' }, { en: 'May', de: 'Mai' }, { en: 'June', de: 'Juni' },
+            { en: 'July', de: 'Juli' }, { en: 'August', de: 'August' }, { en: 'September', de: 'September' },
+            { en: 'October', de: 'Oktober' }, { en: 'November', de: 'November' }, { en: 'December', de: 'Dezember' }
+        ];
+
+        // --- Variables d'état ---
+        let sequence = [];
+        let currentIndex = 0;
+        let score = 0;
+        let isProcessing = false;
+        
+        // Chrono
+        const timeLimit = 15; // 15 secondes
+        let timeLeft = timeLimit;
+        let timerInterval = null;
+
+        // Audio
+        let synth = null;
+
+        // DOM Elements
+        const form = document.getElementById('word-form');
+        const inputField = document.getElementById('word-input');
+        const flagDisplay = document.getElementById('flag-display');
+        const langText = document.getElementById('lang-text');
+        const btnReplay = document.getElementById('btn-replay');
+        const feedbackText = document.getElementById('feedback-text');
+        const wordIndicator = document.getElementById('word-indicator');
+        const progressBar = document.getElementById('progress-bar');
+        const timerBar = document.getElementById('timer-bar');
+        const germanAccentsBar = document.getElementById('german-accents');
+        const accentBtns = document.querySelectorAll('.accent-btn');
+
+        async function initGame() {
+            // Init Audio (Tone.js pour les SFX)
+            await Tone.start();
+            synth = new Tone.PolySynth(Tone.Synth).toDestination();
+            synth.volume.value = -10;
+
+            document.getElementById('start-modal').classList.add('hidden');
+            
+            generateSequence();
+            currentIndex = 0;
+            score = 0;
+            
+            loadTurn();
+        }
+
+        function generateSequence() {
+            sequence = [];
+            // Tirer 10 paires au hasard parmi les 19 possibles
+            let shuffledPairs = [...pairsData].sort(() => 0.5 - Math.random()).slice(0, 10);
+            
+            shuffledPairs.forEach(pair => {
+                // Créer l'objet tâche Anglais
+                const taskEN = { word: pair.en, lang: 'en-GB', flag: '🇬🇧', langName: 'Anglais', twin: pair.de, twinName: 'Allemand' };
+                // Créer l'objet tâche Allemand
+                const taskDE = { word: pair.de, lang: 'de-DE', flag: '🇩🇪', langName: 'Allemand', twin: pair.en, twinName: 'Anglais' };
+                
+                // Pile ou face pour savoir qui passe en premier (Code-Switching dynamique)
+                if (Math.random() > 0.5) {
+                    sequence.push(taskEN, taskDE);
+                } else {
+                    sequence.push(taskDE, taskEN);
+                }
+            });
+        }
+
+        function loadTurn() {
+            isProcessing = false;
+            const currentTask = sequence[currentIndex];
+            
+            // Mise à jour de l'UI
+            wordIndicator.innerText = currentIndex + 1;
+            progressBar.style.width = `${(currentIndex / 20) * 100}%`;
+            
+            flagDisplay.innerText = currentTask.flag;
+            langText.innerText = currentTask.langName;
+            inputField.value = '';
+            inputField.disabled = false;
+            
+            // Afficher/Cacher la barre d'accents allemands
+            if (currentTask.lang === 'de-DE') {
+                germanAccentsBar.classList.remove('hidden');
+            } else {
+                germanAccentsBar.classList.add('hidden');
+            }
+
+            // Couleur du bouton replay selon la langue
+            btnReplay.className = `flex items-center justify-center w-20 h-20 text-white rounded-full shadow-lg border-4 transition-all active:scale-95 ${currentTask.lang === 'en-GB' ? 'bg-blue-500 border-blue-400 hover:bg-blue-600' : 'bg-red-500 border-red-400 hover:bg-red-600'}`;
+
+            feedbackText.classList.remove('opacity-100');
+            feedbackText.classList.add('opacity-0');
+            inputField.classList.remove('border-red-500', 'border-green-500', 'bg-red-900/30', 'bg-green-900/30');
+
+            // Lancer l'audio et le chrono
+            playWord();
+            startTimer();
+            
+            // Focus sur le champ (Sauf sur mobile où ça fait sauter l'écran sans action directe)
+            if (window.innerWidth > 768) {
+                inputField.focus();
+            }
+        }
+
+        // Gestion des boutons d'accents
+        accentBtns.forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.preventDefault(); // Empêche de valider le formulaire
+                if (isProcessing) return;
+                
+                inputField.value += btn.innerText;
+                inputField.focus(); // Reprend le focus après l'ajout
+            });
+        });
+
+        btnReplay.addEventListener('click', (e) => {
+            e.preventDefault();
+            playWord();
+            inputField.focus();
+        });
+
+        function playWord() {
+            const currentTask = sequence[currentIndex];
+            if ('speechSynthesis' in window) {
+                window.speechSynthesis.cancel();
+                
+                btnReplay.classList.add('playing-audio');
+                
+                setTimeout(() => {
+                    const utterance = new SpeechSynthesisUtterance(currentTask.word);
+                    utterance.lang = currentTask.lang;
+                    utterance.rate = 0.85; // Bien articuler
+                    
+                    utterance.onend = () => {
+                        btnReplay.classList.remove('playing-audio');
+                    };
+                    
+                    window.speechSynthesis.speak(utterance);
+                }, 50);
+            }
+        }
+
+        function playSFX(type) {
+            if (!synth) return;
+            const now = Tone.now();
+            if (type === 'success') {
+                synth.triggerAttackRelease("C5", "16n", now);
+                synth.triggerAttackRelease("G5", "8n", now + 0.1);
+            } else if (type === 'error') {
+                synth.triggerAttackRelease("C3", "8n", now);
+            } else if (type === 'timeout') {
+                synth.triggerAttackRelease("G2", "4n", now);
+                synth.triggerAttackRelease("C2", "2n", now + 0.2);
+            }
+        }
+
+        function startTimer() {
+            clearInterval(timerInterval);
+            timeLeft = timeLimit;
+            updateTimerDisplay();
+            
+            timerInterval = setInterval(() => {
+                timeLeft -= 0.1;
+                updateTimerDisplay();
+                
+                if (timeLeft <= 0) {
+                    clearInterval(timerInterval);
+                    handleTimeOut();
+                }
+            }, 100);
+        }
+
+        function updateTimerDisplay() {
+            const percentage = Math.max(0, (timeLeft / timeLimit) * 100);
+            timerBar.style.width = `${percentage}%`;
+            
+            if (percentage > 50) timerBar.style.backgroundColor = '#4ade80'; // Vert
+            else if (percentage > 25) timerBar.style.backgroundColor = '#facc15'; // Jaune
+            else timerBar.style.backgroundColor = '#ef4444'; // Rouge
+        }
+
+        form.addEventListener('submit', (e) => {
+            e.preventDefault();
+            if (isProcessing) return;
+            checkAnswer();
+        });
+
+        function checkAnswer() {
+            isProcessing = true;
+            clearInterval(timerInterval);
+            inputField.disabled = true;
+
+            const currentTask = sequence[currentIndex];
+            const answer = inputField.value.trim();
+            
+            // Correction stricte
+            if (answer === currentTask.word) {
+                // SUCCÈS TOTAL
+                score++;
+                playSFX('success');
+                showFeedback("Parfait ! Orthographe impeccable.", "success");
+                inputField.classList.add('border-green-500', 'bg-green-900/30');
+                
+                setTimeout(nextTurn, 1000); // Enchaînement rapide si juste
+                
+            } else {
+                // ANALYSE DE L'ERREUR (Feedback Intelligent)
+                playSFX('error');
+                inputField.parentElement.classList.add('error-shake');
+                inputField.classList.add('border-red-500', 'bg-red-900/30');
+                
+                let feedbackMsg = `Aïe, il fallait écrire : ${currentTask.word}`;
+                
+                // 1. Oubli de Majuscule ?
+                if (answer.toLowerCase() === currentTask.word.toLowerCase()) {
+                    feedbackMsg = `Presque ! N'oublie pas la MAJUSCULE. ➔ ${currentTask.word}`;
+                } 
+                // 2. Faux-Ami (A écrit le jumeau de l'autre langue ?)
+                else if (answer.toLowerCase() === currentTask.twin.toLowerCase()) {
+                    feedbackMsg = `Attention ! Ça c'est le mot en ${currentTask.twinName}. Ici c'est ${currentTask.word}.`;
+                }
+                
+                showFeedback(feedbackMsg, "error");
+                
+                setTimeout(() => {
+                    inputField.parentElement.classList.remove('error-shake');
+                    setTimeout(nextTurn, 1500); // On laisse plus de temps pour lire la correction
+                }, 400);
+            }
+        }
+
+        function handleTimeOut() {
+            isProcessing = true;
+            inputField.disabled = true;
+            playSFX('timeout');
+            inputField.classList.add('border-red-500');
+            
+            const currentTask = sequence[currentIndex];
+            showFeedback(`Temps écoulé ! Il fallait écrire : ${currentTask.word}`, "error");
+            
+            setTimeout(nextTurn, 2500);
+        }
+
+        function showFeedback(message, type) {
+            feedbackText.innerText = message;
+            feedbackText.className = `text-sm md:text-base font-bold transition-opacity px-4 py-2 rounded-xl opacity-100 ${type === 'success' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`;
+        }
+
+        function nextTurn() {
+            currentIndex++;
+            if (currentIndex < sequence.length) {
+                loadTurn();
+            } else {
+                endGame();
+            }
+        }
+
+        function endGame() {
+            progressBar.style.width = '100%';
+            
+            const endModal = document.getElementById('end-modal');
+            const endTitle = document.getElementById('end-title');
+            const endScore = document.getElementById('end-score');
+            const endMsg = document.getElementById('end-message');
+            const btnRetry = document.getElementById('btn-retry');
+            const endCard = document.getElementById('end-card');
+            
+            endScore.innerText = `${score} / 20`;
+            
+            if (score >= 15) {
+                // VICTOIRE
+                endTitle.innerText = "Niveau Validé !";
+                document.getElementById('end-icon').innerText = "🎓";
+                endMsg.innerText = "Félicitations Timofy ! Tu maîtrises parfaitement l'anglais et l'allemand. Tu es prêt pour l'évaluation !";
+                endCard.classList.add('border-4', 'border-green-400');
+            } else {
+                // ÉCHEC
+                endTitle.innerText = "Presque !";
+                document.getElementById('end-icon').innerText = "💪";
+                endMsg.innerText = "L'orthographe est un défi difficile. Entraîne-toi encore un peu pour atteindre au moins 15/20 !";
+                btnRetry.classList.remove('hidden'); // Affiche le bouton Réessayer
+                endCard.classList.add('border-4', 'border-red-400');
+            }
+            
+            endModal.classList.remove('hidden');
+            endModal.classList.add('flex');
+        }
+
+        function finishLevel() {
+            // Sauvegarder la victoire (Pour afficher 5/5 dans le menu)
+            if (score >= 15) {
+                localStorage.setItem('timofy_progress', '6'); // 6 signifie "A tout fini"
+            }
+            window.location.href = 'index.html';
+        }
+
+    </script>
+</body>
+</html>

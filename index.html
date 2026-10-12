@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Timofy - Mission Bilangue</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;700;900&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Nunito', sans-serif;
+            /* Fond avec des touches de bleu (anglais), rouge et jaune (allemand) */
+            background: linear-gradient(135deg, #e0f2fe 0%, #fef08a 50%, #fee2e2 100%);
+        }
+        .level-card {
+            transition: all 0.3s ease;
+        }
+        .level-card.unlocked:hover {
+            transform: translateY(-5px) scale(1.02);
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+        }
+        .bounce-animation {
+            animation: bounce 1s infinite;
+        }
+        @keyframes bounce {
+            0%, 100% { transform: translateY(-25%); animation-timing-function: cubic-bezier(0.8,0,1,1); }
+            50% { transform: none; animation-timing-function: cubic-bezier(0,0,0.2,1); }
+        }
+    </style>
+</head>
+<body class="min-h-screen flex items-center justify-center p-4">
+
+    <main class="bg-white/90 backdrop-blur-sm w-full max-w-md rounded-3xl shadow-2xl overflow-hidden border-4 border-white relative">
+        
+        <!-- En-tête -->
+        <header class="bg-gradient-to-r from-blue-500 via-yellow-400 to-red-500 p-6 text-center rounded-t-2xl relative overflow-hidden">
+            <div class="absolute inset-0 bg-black/10"></div>
+            <h1 class="text-3xl font-black text-white relative z-10 drop-shadow-md tracking-wide">
+                Mission Bilangue
+            </h1>
+            <p class="text-white/90 relative z-10 font-bold mt-1 drop-shadow">
+                🇬🇧 English & Deutsch 🇩🇪
+            </p>
+            <div class="mt-3 relative z-10 bg-white/20 inline-block px-4 py-1 rounded-full text-white font-bold backdrop-blur-md">
+                Profil : Timofy 🚀
+            </div>
+        </header>
+
+        <!-- Liste des niveaux -->
+        <div id="levels-container" class="p-6 space-y-4">
+            <!-- Les niveaux seront générés ici par JavaScript -->
+        </div>
+
+        <!-- Pied de page et bouton Reset -->
+        <footer class="p-4 text-center border-t border-gray-100 flex justify-between items-center bg-gray-50/50">
+            <span class="text-sm text-gray-500 font-bold" id="progress-text">Progression: 0/5</span>
+            <button id="reset-btn" class="text-xs text-gray-400 hover:text-red-500 transition-colors underline cursor-pointer px-2 py-1 rounded">
+                Réinitialiser la progression
+            </button>
+        </footer>
+    </main>
+
+    <!-- Modal de succès (remplace alert()) -->
+    <div id="success-modal" class="fixed inset-0 bg-black/50 backdrop-blur-sm hidden items-center justify-center z-50 p-4">
+        <div class="bg-white rounded-2xl p-8 max-w-sm w-full text-center shadow-2xl transform scale-95 transition-transform duration-300">
+            <div class="text-5xl mb-4 bounce-animation">🌟</div>
+            <h2 class="text-2xl font-black text-gray-800 mb-2" id="modal-title">Bravo !</h2>
+            <p class="text-gray-600 mb-6 font-bold" id="modal-message">Niveau terminé avec succès.</p>
+            <button id="modal-btn" class="w-full bg-gradient-to-r from-blue-500 to-blue-600 text-white font-bold py-3 rounded-xl shadow-lg hover:shadow-xl hover:from-blue-600 hover:to-blue-700 transition-all">
+                Niveau Suivant 🚀
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // Définition des 5 niveaux de la progression didactique
+        const levelsData = [
+            { id: 1, title: "L'Oreille", desc: "Memory sonore", icon: "🎧", color: "from-blue-400 to-blue-500" },
+            { id: 2, title: "Les Jumeaux", desc: "Association texte/son", icon: "👯", color: "from-indigo-400 to-indigo-500" },
+            { id: 3, title: "La Suite Logique", desc: "Drag & Drop visuel", icon: "🧩", color: "from-yellow-400 to-yellow-500" },
+            { id: 4, title: "Le Studio", desc: "Reconnaissance vocale", icon: "🎤", color: "from-orange-400 to-orange-500" },
+            { id: 5, title: "Le Défi Final", desc: "Écriture au clavier avec chrono", icon: "⌨️", color: "from-red-400 to-red-500" }
+        ];
+
+        // Éléments du DOM
+        const container = document.getElementById('levels-container');
+        const progressText = document.getElementById('progress-text');
+        const resetBtn = document.getElementById('reset-btn');
+        const modal = document.getElementById('success-modal');
+        const modalBtn = document.getElementById('modal-btn');
+        const modalMessage = document.getElementById('modal-message');
+
+        let currentUnlockedLevel = 1;
+
+        // Initialisation depuis le localStorage
+        function loadProgress() {
+            const savedLevel = localStorage.getItem('timofy_progress');
+            if (savedLevel) {
+                currentUnlockedLevel = parseInt(savedLevel);
+                // Sécurité pour ne pas dépasser le nombre de niveaux
+                if (currentUnlockedLevel > levelsData.length) currentUnlockedLevel = levelsData.length;
+            } else {
+                currentUnlockedLevel = 1;
+            }
+        }
+
+        function saveProgress() {
+            localStorage.setItem('timofy_progress', currentUnlockedLevel);
+        }
+
+        // Rendu visuel des niveaux
+        function renderLevels() {
+            container.innerHTML = ''; // On vide le conteneur
+
+            levelsData.forEach((level, index) => {
+                const isUnlocked = level.id <= currentUnlockedLevel;
+                const isNextToUnlock = level.id === currentUnlockedLevel;
+
+                // Création de l'élément de carte
+                const card = document.createElement('div');
+                card.className = `level-card relative rounded-xl p-4 flex items-center gap-4 ${isUnlocked ? 'cursor-pointer bg-white border-2 border-gray-100 shadow-sm unlocked' : 'bg-gray-100 border-2 border-transparent opacity-70 cursor-not-allowed'}`;
+                
+                // Clic sur la carte
+                if (isUnlocked) {
+                    // Bordure colorée si c'est le niveau actuel à faire
+                    if(isNextToUnlock) {
+                        card.classList.add('border-blue-400', 'ring-4', 'ring-blue-100');
+                    }
+                    card.onclick = () => {
+                        window.location.href = `niveau${level.id}.html`;
+                    };
+                }
+
+                // Icône
+                const iconDiv = document.createElement('div');
+                iconDiv.className = `w-14 h-14 rounded-full flex items-center justify-center text-2xl shadow-inner ${isUnlocked ? `bg-gradient-to-br ${level.color} text-white` : 'bg-gray-300 text-gray-500'}`;
+                iconDiv.innerHTML = isUnlocked ? level.icon : '🔒';
+
+                // Textes
+                const textDiv = document.createElement('div');
+                textDiv.className = "flex-1";
+                textDiv.innerHTML = `
+                    <h3 class="font-black text-lg ${isUnlocked ? 'text-gray-800' : 'text-gray-500'}">Niveau ${level.id} : ${level.title}</h3>
+                    <p class="text-sm font-bold ${isUnlocked ? 'text-gray-500' : 'text-gray-400'}">${level.desc}</p>
+                `;
+
+                // Badge "Complété"
+                if (level.id < currentUnlockedLevel) {
+                    const badge = document.createElement('div');
+                    badge.className = "absolute -top-2 -right-2 bg-green-500 text-white text-xs font-bold px-2 py-1 rounded-full shadow-md border-2 border-white";
+                    badge.innerText = "✓ Fait";
+                    card.appendChild(badge);
+                }
+
+                card.appendChild(iconDiv);
+                card.appendChild(textDiv);
+                container.appendChild(card);
+            });
+
+            // Mise à jour du texte de progression
+            // Si on a terminé le niveau 5, on affiche 5/5, sinon currentUnlockedLevel - 1
+            const completedCount = currentUnlockedLevel > levelsData.length ? levelsData.length : currentUnlockedLevel - 1;
+            progressText.innerText = `Progression: ${completedCount}/${levelsData.length}`;
+        }
+
+        // Simulation de la réussite d'un jeu
+        function simulateGameCompletion(playedLevelId) {
+            // Afficher la modale de succès
+            modalMessage.innerText = `Tu as brillamment réussi le niveau "${levelsData[playedLevelId-1].title}".`;
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+            
+            // Animation d'apparition
+            modal.firstElementChild.classList.remove('scale-95', 'opacity-0');
+            modal.firstElementChild.classList.add('scale-100', 'opacity-100');
+
+            // Action du bouton de la modale
+            modalBtn.onclick = () => {
+                // Si le joueur a joué le niveau le plus haut débloqué et qu'il reste des niveaux
+                if (playedLevelId === currentUnlockedLevel && currentUnlockedLevel <= levelsData.length) {
+                    currentUnlockedLevel++;
+                    saveProgress();
+                }
+                
+                // Fermer la modale
+                modal.classList.add('hidden');
+                modal.classList.remove('flex');
+                
+                // Recharger l'affichage
+                renderLevels();
+            };
+        }
+
+        // Réinitialisation globale
+        resetBtn.addEventListener('click', () => {
+            // Utilisation d'un confirm simulé ou basique. Ici, comme demandé par les règles système "no alert/confirm", on réinitialise directement de manière fluide.
+            localStorage.removeItem('timofy_progress');
+            currentUnlockedLevel = 1;
+            renderLevels();
+            
+            // Petit feedback visuel sur le bouton
+            const originalText = resetBtn.innerText;
+            resetBtn.innerText = "✓ Données effacées";
+            resetBtn.classList.add('text-green-500');
+            setTimeout(() => {
+                resetBtn.innerText = originalText;
+                resetBtn.classList.remove('text-green-500');
+            }, 2000);
+        });
+
+        // Démarrage de l'application
+        window.onload = () => {
+            loadProgress();
+            renderLevels();
+        };
+
+    </script>
+</body>
+</html>

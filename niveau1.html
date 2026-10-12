@@ -1,0 +1,550 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Niveau 1 - L'Oreille (Memory Sonore)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;700;900&display=swap" rel="stylesheet">
+    
+    <style>
+        body {
+            font-family: 'Nunito', sans-serif;
+            background-color: #f3f4f6;
+            background-image: radial-gradient(#e5e7eb 1px, transparent 1px);
+            background-size: 20px 20px;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Classes pour l'animation 3D du Memory */
+        .perspective {
+            perspective: 1000px;
+        }
+        .preserve-3d {
+            transform-style: preserve-3d;
+        }
+        .backface-hidden {
+            backface-visibility: hidden;
+            -webkit-backface-visibility: hidden;
+        }
+        .rotate-y-180 {
+            transform: rotateY(180deg);
+        }
+        .card-inner {
+            transition: transform 0.6s cubic-bezier(0.4, 0.2, 0.2, 1);
+        }
+        
+        /* Grilles adaptatives selon le nombre de cartes */
+        .grid-14 {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 0.75rem;
+        }
+        @media (min-width: 640px) {
+            .grid-14 { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1rem; }
+            .grid-14 > :nth-last-child(-n+2):nth-child(4n+1) { grid-column: span 2 / span 2; justify-self: center; width: 50%; } /* Center last row if odd */
+        }
+        
+        .grid-24 {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 0.5rem;
+        }
+        @media (min-width: 640px) {
+            .grid-24 { grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 1rem; }
+        }
+
+        /* Animation d'apparition de la modale */
+        @keyframes popIn {
+            0% { transform: scale(0.9); opacity: 0; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+        .animate-pop {
+            animation: popIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+        }
+
+        @keyframes match-disappear {
+            0% { transform: scale(1); opacity: 1; }
+            40% { transform: scale(1.1); opacity: 1; } /* Petit rebond avant de disparaître */
+            100% { transform: scale(0); opacity: 0; }
+        }
+        .matched-out {
+            animation: match-disappear 0.6s forwards cubic-bezier(0.4, 0, 0.2, 1);
+            pointer-events: none; /* Désactive les clics sur l'espace vide */
+        }
+    </style>
+</head>
+<body>
+
+    <header class="bg-white shadow-sm p-4 sticky top-0 z-10">
+        <div class="max-w-4xl mx-auto flex justify-between items-center">
+            <h1 class="text-xl md:text-2xl font-black text-gray-800 flex items-center gap-2">
+                <span class="text-3xl">🎧</span> L'Oreille
+            </h1>
+            <div class="flex items-center gap-4">
+                <div class="bg-gray-100 px-4 py-2 rounded-xl font-bold text-gray-600 shadow-inner">
+                    Manche <span id="round-indicator" class="text-blue-500 font-black text-lg">1</span> / 4
+                </div>
+                <button onclick="window.location.href='index.html'" class="text-gray-400 hover:text-red-500 transition font-bold text-sm bg-gray-50 px-3 py-2 rounded-lg border border-gray-200">
+                    Quitter
+                </button>
+            </div>
+        </div>
+        <!-- Barre de progression de la manche -->
+        <div class="max-w-4xl mx-auto mt-3 bg-gray-200 rounded-full h-2.5 overflow-hidden">
+            <div id="progress-bar" class="bg-green-500 h-2.5 rounded-full w-0 transition-all duration-500"></div>
+        </div>
+    </header>
+
+    <main class="flex-grow flex items-center justify-center p-4">
+        <div class="max-w-4xl w-full">
+            <h2 id="round-title" class="text-center text-2xl font-black text-gray-700 mb-2 drop-shadow-sm">
+                Les Jours (Anglais)
+            </h2>
+            
+            <!-- Nouvelle Jauge de concentration -->
+            <div class="max-w-md mx-auto mb-6">
+                <div class="flex justify-between text-xs font-bold text-gray-500 mb-1 px-1">
+                    <span>Concentration</span>
+                    <span id="attempts-counter">0 tentative</span>
+                </div>
+                <div class="bg-gray-200 rounded-full h-3 overflow-hidden shadow-inner border border-gray-300">
+                    <div id="concentration-bar" class="h-full w-full rounded-full transition-all duration-300 ease-out" style="background-color: #22c55e;"></div>
+                </div>
+            </div>
+            
+            <!-- Le plateau de jeu (le conteneur sera rempli par JS) -->
+            <div id="game-board" class="w-full mx-auto"></div>
+        </div>
+    </main>
+
+    <!-- Modale de fin de manche -->
+    <div id="round-modal" class="fixed inset-0 bg-gray-900/60 backdrop-blur-sm hidden items-center justify-center z-50 p-4">
+        <div class="bg-white rounded-3xl p-8 max-w-sm w-full text-center shadow-2xl animate-pop">
+            <div class="text-6xl mb-4">🌟</div>
+            <h3 class="text-2xl font-black text-gray-800 mb-2">Superbe Timofy !</h3>
+            <p class="text-gray-600 mb-4 font-bold">Manche terminée avec succès.</p>
+            <!-- Nouveau paragraphe pour le message personnalisé -->
+            <p id="round-feedback" class="text-sm px-4 py-2 rounded-xl mb-6 font-bold"></p>
+            <button id="next-round-btn" class="w-full bg-blue-500 text-white font-black py-4 rounded-xl shadow-lg hover:bg-blue-600 hover:-translate-y-1 transition-all">
+                Manche Suivante 🚀
+            </button>
+        </div>
+    </div>
+
+    <!-- Modale de victoire finale -->
+    <div id="victory-modal" class="fixed inset-0 bg-gray-900/80 backdrop-blur-md hidden items-center justify-center z-50 p-4">
+        <div class="bg-gradient-to-br from-white to-gray-50 rounded-3xl p-8 max-w-md w-full text-center shadow-2xl animate-pop border-4 border-yellow-400">
+            <div class="text-7xl mb-4 animate-bounce">🏆</div>
+            <h3 class="text-3xl font-black text-gray-800 mb-2">Niveau Validé Timofy !</h3>
+            <p class="text-gray-600 mb-4 font-bold text-lg">Ton oreille est parfaitement aiguisée. Tu peux passer au niveau des Jumeaux !</p>
+            <!-- Nouveau paragraphe pour le message personnalisé final -->
+            <p id="victory-feedback" class="text-sm px-4 py-2 rounded-xl mb-8 font-bold border-2"></p>
+            <button onclick="finishLevel()" class="w-full bg-gradient-to-r from-green-400 to-green-600 text-white font-black text-xl py-4 rounded-xl shadow-xl hover:shadow-2xl hover:scale-105 transition-all">
+                Retour au Menu Principal
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // Données du jeu
+        const daysEN = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+        const daysDE = ['Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag', 'Sonntag'];
+        const monthsEN = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+        const monthsDE = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'];
+
+        // Configuration des 4 manches
+        const roundsData = [
+            {
+                title: "🇬🇧 Les Jours (Anglais)",
+                langCode: "en-GB",
+                themeClass: "from-blue-400 to-blue-600", // Thème Anglais (Bleu)
+                label: "week",
+                items: daysEN.map((word, index) => ({ word, val: index + 1 })),
+                gridClass: "grid-14" // 14 cartes (7 paires)
+            },
+            {
+                title: "🇩🇪 Les Jours (Allemand)",
+                langCode: "de-DE",
+                themeClass: "from-red-500 via-red-400 to-yellow-400", // Thème Allemand (Rouge/Jaune)
+                label: "Woche",
+                items: daysDE.map((word, index) => ({ word, val: index + 1 })),
+                gridClass: "grid-14"
+            },
+            {
+                title: "🇬🇧 Les Mois (Anglais)",
+                langCode: "en-GB",
+                themeClass: "from-blue-400 to-blue-600",
+                label: "month",
+                items: monthsEN.map((word, index) => ({ word, val: index + 1 })),
+                gridClass: "grid-24" // 24 cartes (12 paires)
+            },
+            {
+                title: "🇩🇪 Les Mois (Allemand)",
+                langCode: "de-DE",
+                themeClass: "from-red-500 via-red-400 to-yellow-400",
+                label: "Monat",
+                items: monthsDE.map((word, index) => ({ word, val: index + 1 })),
+                gridClass: "grid-24"
+            }
+        ];
+
+        let currentRoundIndex = 0;
+        let cardsArray = [];
+        let firstCard = null;
+        let secondCard = null;
+        let lockBoard = false;
+        let matchedPairs = 0;
+        
+        // Nouvelles variables pour la gestion des tentatives
+        let attemptsCount = 0;
+        let maxYellowZone = 0; // Limite avant de passer dans le rouge (barre à 0%)
+
+        const boardEl = document.getElementById('game-board');
+        const titleEl = document.getElementById('round-title');
+        const indicatorEl = document.getElementById('round-indicator');
+        const progressBarEl = document.getElementById('progress-bar');
+        const concentrationBarEl = document.getElementById('concentration-bar');
+        const attemptsCounterEl = document.getElementById('attempts-counter');
+        const roundModal = document.getElementById('round-modal');
+        const victoryModal = document.getElementById('victory-modal');
+        const roundFeedbackEl = document.getElementById('round-feedback');
+        const victoryFeedbackEl = document.getElementById('victory-feedback');
+
+        // Icônes SVG
+        const iconSpeaker = `<svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M11 5L6 9H2v6h4l5 4V5z" /></svg>`;
+        const iconQuestion = `<svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 text-white opacity-80" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>`;
+
+        let synth;
+        // Le navigateur a besoin d'une interaction utilisateur (clic) pour autoriser le son
+        window.addEventListener('click', async () => {
+            if (!synth) {
+                await Tone.start();
+                synth = new Tone.PolySynth(Tone.Synth).toDestination();
+                synth.volume.value = -12; // Volume modéré pour ne pas faire sursauter
+            }
+        }, { once: true });
+
+        function playSuccessSound() {
+            if (synth) {
+                const now = Tone.now();
+                // Joue un petit arpège rapide de victoire (Do - Mi - Sol)
+                synth.triggerAttackRelease("C5", "16n", now);
+                synth.triggerAttackRelease("E5", "16n", now + 0.1);
+                synth.triggerAttackRelease("G5", "8n", now + 0.2);
+            }
+        }
+
+        function initRound() {
+            const currentRound = roundsData[currentRoundIndex];
+            titleEl.innerText = currentRound.title;
+            indicatorEl.innerText = currentRoundIndex + 1;
+            boardEl.className = currentRound.gridClass;
+            
+            // Réinitialisation des compteurs et de la barre
+            matchedPairs = 0;
+            attemptsCount = 0;
+            
+            // Définition de la limite rouge selon la taille de la grille (14 ou 24 cartes)
+            if (currentRound.items.length === 7) {
+                maxYellowZone = 18; // Zone rouge à 19
+            } else {
+                maxYellowZone = 30; // Zone rouge à 31
+            }
+            
+            updateConcentrationBar();
+            updateProgress();
+
+            // Création des paires de cartes (Type A: Son, Type B: Sens)
+            cardsArray = [];
+            currentRound.items.forEach(item => {
+                // Carte Son (Audio uniquement)
+                cardsArray.push({
+                    type: 'audio',
+                    val: item.val,
+                    word: item.word,
+                    lang: currentRound.langCode,
+                    theme: currentRound.themeClass
+                });
+                // Carte Sens (Visuel uniquement)
+                cardsArray.push({
+                    type: 'meaning',
+                    val: item.val,
+                    label: currentRound.label
+                });
+            });
+
+            // Mélange de Fisher-Yates
+            for (let i = cardsArray.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [cardsArray[i], cardsArray[j]] = [cardsArray[j], cardsArray[i]];
+            }
+
+            renderBoard();
+        }
+
+        function renderBoard() {
+            boardEl.innerHTML = '';
+            
+            cardsArray.forEach((cardData, index) => {
+                const cardWrapper = document.createElement('div');
+                // Hauteur responsive adaptée au nombre de cartes
+                cardWrapper.className = `perspective cursor-pointer ${currentRoundIndex >= 2 ? 'h-24 sm:h-32' : 'h-32 sm:h-40'}`;
+                cardWrapper.dataset.index = index;
+                cardWrapper.addEventListener('click', flipCard);
+
+                // Contenu HTML de la carte (Structure 3D)
+                let frontFace, backFace;
+
+                // Face cachée (par défaut)
+                frontFace = `
+                    <div class="absolute w-full h-full backface-hidden bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl shadow-md border-4 border-white/20 flex items-center justify-center">
+                        ${iconQuestion}
+                    </div>
+                `;
+
+                // Face dévoilée
+                if (cardData.type === 'audio') {
+                    backFace = `
+                        <div class="absolute w-full h-full backface-hidden rotate-y-180 bg-gradient-to-br ${cardData.theme} rounded-2xl shadow-xl flex items-center justify-center ring-2 ring-white/50">
+                            ${iconSpeaker}
+                        </div>
+                    `;
+                } else {
+                    backFace = `
+                        <div class="absolute w-full h-full backface-hidden rotate-y-180 bg-white rounded-2xl shadow-xl flex flex-col items-center justify-center border-4 border-gray-100">
+                            <span class="text-3xl sm:text-5xl font-black text-gray-700">${cardData.val}</span>
+                            <span class="text-xs sm:text-sm font-bold text-gray-400 mt-1 uppercase tracking-wider">${cardData.label} ${cardData.val}</span>
+                        </div>
+                    `;
+                }
+
+                cardWrapper.innerHTML = `
+                    <div class="card-inner relative w-full h-full preserve-3d">
+                        ${frontFace}
+                        ${backFace}
+                    </div>
+                `;
+
+                boardEl.appendChild(cardWrapper);
+            });
+        }
+
+        function flipCard() {
+            if (lockBoard) return;
+            const index = this.dataset.index;
+            const cardData = cardsArray[index];
+            const inner = this.querySelector('.card-inner');
+
+            // Si carte déjà retournée ou matchée, on ignore
+            if (inner.classList.contains('rotate-y-180')) return;
+
+            // Retournement visuel
+            inner.classList.add('rotate-y-180');
+
+            // Lecture audio si c'est une carte Son
+            if (cardData.type === 'audio') {
+                playSound(cardData.word, cardData.lang);
+            }
+
+            if (!firstCard) {
+                // Premier clic
+                firstCard = { el: this, data: cardData };
+                return;
+            }
+
+            // Deuxième clic
+            secondCard = { el: this, data: cardData };
+            
+            // On incrémente le nombre de tentatives (1 paire retournée = 1 tentative)
+            attemptsCount++;
+            updateConcentrationBar();
+            
+            checkForMatch();
+        }
+
+        function playSound(text, lang) {
+            // Utilisation de l'API SpeechSynthesis
+            if ('speechSynthesis' in window) {
+                window.speechSynthesis.cancel(); // Coupe le son précédent si clics rapides
+                const utterance = new SpeechSynthesisUtterance(text);
+                utterance.lang = lang;
+                utterance.rate = 0.9; // Légèrement ralenti pour la compréhension
+                window.speechSynthesis.speak(utterance);
+            }
+        }
+
+        function checkForMatch() {
+            // Un match est validé si les DEUX cartes ont la même valeur (val)
+            // ET si elles sont de types différents (une audio, une meaning).
+            // (La vérification du type empêche de matcher deux cartes audio si on trichait, bien que notre grille ait généré 1 audio/1 meaning exact par paire)
+            
+            let isMatch = (firstCard.data.val === secondCard.data.val) && (firstCard.data.type !== secondCard.data.type);
+
+            if (isMatch) {
+                disableCards();
+            } else {
+                unflipCards();
+            }
+        }
+
+        function disableCards() {
+            // On sauvegarde les éléments pour les manipuler en toute sécurité dans le setTimeout
+            const el1 = firstCard.el;
+            const el2 = secondCard.el;
+
+            if (el1) el1.removeEventListener('click', flipCard);
+            if (el2) el2.removeEventListener('click', flipCard);
+            
+            // On joue le petit jingle musical !
+            playSuccessSound();
+            
+            // Effet visuel : Les cartes disparaissent après un court délai
+            setTimeout(() => {
+                if (el1) el1.classList.add('matched-out');
+                if (el2) el2.classList.add('matched-out');
+            }, 600); // 600ms permet à Timofy de bien voir la paire qu'il a trouvée
+
+            matchedPairs++;
+            updateProgress();
+            resetBoard();
+
+            // Vérification de la fin de la manche
+            const currentRound = roundsData[currentRoundIndex];
+            if (matchedPairs === currentRound.items.length) {
+                // On attend que la dernière animation de disparition soit finie avant d'afficher le menu
+                setTimeout(handleRoundEnd, 1200);
+            }
+        }
+
+        function unflipCards() {
+            lockBoard = true;
+            // On recache après 1.2s pour laisser le temps d'entendre/voir
+            setTimeout(() => {
+                if (firstCard && firstCard.el) {
+                    firstCard.el.querySelector('.card-inner').classList.remove('rotate-y-180');
+                }
+                if (secondCard && secondCard.el) {
+                    secondCard.el.querySelector('.card-inner').classList.remove('rotate-y-180');
+                }
+                resetBoard();
+            }, 1200);
+        }
+
+        function resetBoard() {
+            [firstCard, secondCard, lockBoard] = [null, null, false];
+        }
+
+        function updateProgress() {
+            const currentRound = roundsData[currentRoundIndex];
+            const percentage = (matchedPairs / currentRound.items.length) * 100;
+            progressBarEl.style.width = `${percentage}%`;
+        }
+        
+        function updateConcentrationBar() {
+            attemptsCounterEl.innerText = `${attemptsCount} tentative${attemptsCount > 1 ? 's' : ''}`;
+            
+            // Calcul du pourcentage restant (100% au début, 0% quand on atteint maxYellowZone)
+            // Si attemptsCount > maxYellowZone, le pourcentage sera bloqué à 0
+            let percentage = Math.max(0, 100 - ((attemptsCount / maxYellowZone) * 100));
+            
+            concentrationBarEl.style.width = `${percentage}%`;
+            
+            // Logique des couleurs de la barre (Vert -> Jaune -> Rouge)
+            let color = "";
+            let currentItems = roundsData[currentRoundIndex].items.length;
+            
+            // Grille de 14 cartes (7 paires)
+            if (currentItems === 7) {
+                if (attemptsCount <= 12) color = "#22c55e"; // Vert (Tailwind green-500)
+                else if (attemptsCount <= 18) color = "#eab308"; // Jaune (Tailwind yellow-500)
+                else color = "#ef4444"; // Rouge (Tailwind red-500)
+            } 
+            // Grille de 24 cartes (12 paires)
+            else {
+                if (attemptsCount <= 20) color = "#22c55e"; // Vert
+                else if (attemptsCount <= 30) color = "#eab308"; // Jaune
+                else color = "#ef4444"; // Rouge
+            }
+            
+            concentrationBarEl.style.backgroundColor = color;
+        }
+        
+        function getFeedbackData() {
+            let currentItems = roundsData[currentRoundIndex].items.length;
+            let theme = { bg: "", text: "", message: "" };
+            
+            if (currentItems === 7) {
+                if (attemptsCount <= 12) {
+                    theme.bg = "bg-green-100"; theme.text = "text-green-700";
+                    theme.message = "Et quelle mémoire visuelle, tu as été super rapide !";
+                } else if (attemptsCount <= 18) {
+                    theme.bg = "bg-yellow-100"; theme.text = "text-yellow-700";
+                    theme.message = "Essaie de faire un peu moins de tentatives à la manche suivante pour tester ta mémoire.";
+                } else {
+                    theme.bg = "bg-red-100"; theme.text = "text-red-700";
+                    theme.message = "Oups, tu as utilisé beaucoup de tentatives ! Prends ton temps pour bien mémoriser les cartes la prochaine fois.";
+                }
+            } else {
+                if (attemptsCount <= 20) {
+                    theme.bg = "bg-green-100"; theme.text = "text-green-700";
+                    theme.message = "Et quelle mémoire visuelle, tu as été super rapide !";
+                } else if (attemptsCount <= 30) {
+                    theme.bg = "bg-yellow-100"; theme.text = "text-yellow-700";
+                    theme.message = "Essaie de faire un peu moins de tentatives à la manche suivante pour tester ta mémoire.";
+                } else {
+                    theme.bg = "bg-red-100"; theme.text = "text-red-700";
+                    theme.message = "Oups, tu as utilisé beaucoup de tentatives ! Prends ton temps pour bien mémoriser les cartes la prochaine fois.";
+                }
+            }
+            return theme;
+        }
+
+        function handleRoundEnd() {
+            const feedback = getFeedbackData();
+            
+            if (currentRoundIndex < roundsData.length - 1) {
+                // Configurer le message pour la modale de manche
+                roundFeedbackEl.className = `text-sm px-4 py-2 rounded-xl mb-6 font-bold ${feedback.bg} ${feedback.text}`;
+                roundFeedbackEl.innerText = feedback.message;
+                
+                roundModal.classList.remove('hidden');
+                roundModal.classList.add('flex');
+            } else {
+                // Configurer le message pour la modale finale
+                victoryFeedbackEl.className = `text-sm px-4 py-2 rounded-xl mb-8 font-bold border-2 ${feedback.bg} ${feedback.text} border-${feedback.text.split('-')[1]}-200`;
+                victoryFeedbackEl.innerText = feedback.message;
+                
+                victoryModal.classList.remove('hidden');
+                victoryModal.classList.add('flex');
+            }
+        }
+
+        document.getElementById('next-round-btn').addEventListener('click', () => {
+            roundModal.classList.add('hidden');
+            roundModal.classList.remove('flex');
+            currentRoundIndex++;
+            initRound();
+        });
+
+        function finishLevel() {
+            // Sauvegarde de la progression pour le menu principal
+            // 'timofy_progress' à 2 signifie que le Niveau 2 est débloqué dans index.html
+            localStorage.setItem('timofy_progress', '2');
+            
+            // Sécurité additionnelle requise dans le prompt
+            localStorage.setItem('niveau2_unlocked', 'true');
+            
+            // Retour au menu
+            window.location.href = 'index.html';
+        }
+
+        // Lancement de la première manche au chargement
+        window.onload = initRound;
+
+    </script>
+</body>
+</html>

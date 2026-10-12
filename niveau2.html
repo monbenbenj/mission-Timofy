@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Niveau 2 - Les Jumeaux</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;700;900&display=swap" rel="stylesheet">
+    
+    <style>
+        body {
+            font-family: 'Nunito', sans-serif;
+            background-color: #f8fafc;
+            background-image: 
+                radial-gradient(circle at 100% 100%, #e0f2fe 0, transparent 50%),
+                radial-gradient(circle at 0% 0%, #fef08a 0, transparent 50%);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Animations pour les sélections et les erreurs */
+        @keyframes pulse-border {
+            0% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.7); }
+            70% { box-shadow: 0 0 0 10px rgba(59, 130, 246, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0); }
+        }
+        
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-5px) rotate(-2deg); }
+            75% { transform: translateX(5px) rotate(2deg); }
+        }
+
+        .selected {
+            border-color: #3b82f6 !important;
+            background-color: #eff6ff !important;
+            transform: scale(1.02);
+            animation: pulse-border 1.5s infinite;
+            z-index: 10;
+        }
+
+        .error-shake {
+            animation: shake 0.4s ease-in-out;
+            background-color: #fee2e2 !important;
+            border-color: #ef4444 !important;
+        }
+
+        .matched {
+            opacity: 0;
+            transform: scale(0.8);
+            pointer-events: none;
+            transition: all 0.5s ease-out;
+        }
+
+        /* Transition fluide pour les boutons */
+        .game-btn {
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        @keyframes popIn {
+            0% { transform: scale(0.9); opacity: 0; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+        .animate-pop {
+            animation: popIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+        }
+    </style>
+</head>
+<body>
+
+    <header class="bg-white/80 backdrop-blur-md shadow-sm p-4 sticky top-0 z-20">
+        <div class="max-w-4xl mx-auto flex justify-between items-center">
+            <h1 class="text-xl md:text-2xl font-black text-gray-800 flex items-center gap-2">
+                <span class="text-3xl">👯</span> Les Jumeaux
+            </h1>
+            <div class="flex items-center gap-4">
+                <div class="bg-indigo-50 px-4 py-2 rounded-xl font-bold text-indigo-600 shadow-inner">
+                    Manche <span id="round-indicator" class="font-black text-lg">1</span> / 4
+                </div>
+                <button onclick="window.location.href='index.html'" class="text-gray-400 hover:text-red-500 transition font-bold text-sm bg-white px-3 py-2 rounded-lg border border-gray-200 shadow-sm">
+                    Quitter
+                </button>
+            </div>
+        </div>
+        <div class="max-w-4xl mx-auto mt-3 bg-gray-200 rounded-full h-2 overflow-hidden">
+            <div id="progress-bar" class="bg-indigo-500 h-2 rounded-full w-0 transition-all duration-500"></div>
+        </div>
+    </header>
+
+    <main class="flex-grow flex items-center justify-center p-4">
+        <div class="max-w-4xl w-full">
+            <h2 id="round-title" class="text-center text-xl sm:text-2xl font-black text-gray-700 mb-2 drop-shadow-sm">
+                Relie le son au mot
+            </h2>
+            <p id="round-subtitle" class="text-center text-gray-500 font-bold mb-8 text-sm sm:text-base">
+                Clique sur un élément à gauche, puis trouve sa paire à droite.
+            </p>
+            
+            <!-- Plateau à 2 colonnes -->
+            <div class="grid grid-cols-2 gap-4 sm:gap-12 relative">
+                <!-- Ligne de séparation au milieu (visuelle) -->
+                <div class="hidden sm:block absolute left-1/2 top-0 bottom-0 w-1 bg-gray-200 rounded-full transform -translate-x-1/2 opacity-50"></div>
+                
+                <!-- Colonne Gauche -->
+                <div id="col-left" class="flex flex-col gap-3"></div>
+                
+                <!-- Colonne Droite -->
+                <div id="col-right" class="flex flex-col gap-3"></div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Modale de fin de manche -->
+    <div id="round-modal" class="fixed inset-0 bg-gray-900/60 backdrop-blur-sm hidden items-center justify-center z-50 p-4">
+        <div class="bg-white rounded-3xl p-8 max-w-sm w-full text-center shadow-2xl animate-pop">
+            <div class="text-6xl mb-4">✨</div>
+            <h3 class="text-2xl font-black text-gray-800 mb-2">Excellent !</h3>
+            <p class="text-gray-600 mb-6 font-bold" id="round-modal-text">Tu as trouvé toutes les paires.</p>
+            <button id="next-round-btn" class="w-full bg-indigo-500 text-white font-black py-4 rounded-xl shadow-lg hover:bg-indigo-600 hover:-translate-y-1 transition-all">
+                Manche Suivante 🚀
+            </button>
+        </div>
+    </div>
+
+    <!-- Modale de victoire finale -->
+    <div id="victory-modal" class="fixed inset-0 bg-gray-900/80 backdrop-blur-md hidden items-center justify-center z-50 p-4">
+        <div class="bg-gradient-to-br from-indigo-500 to-purple-600 rounded-3xl p-8 max-w-md w-full text-center shadow-2xl animate-pop border-4 border-white/20">
+            <div class="text-7xl mb-4">🎉</div>
+            <h3 class="text-3xl font-black text-white mb-2">Niveau Validé !</h3>
+            <p class="text-indigo-100 mb-8 font-bold text-lg">Tu commences à faire le lien entre les langues. Prêt pour la suite logique ?</p>
+            <button onclick="finishLevel()" class="w-full bg-white text-indigo-600 font-black text-xl py-4 rounded-xl shadow-xl hover:shadow-2xl hover:scale-105 transition-all">
+                Retour au Menu
+            </button>
+        </div>
+    </div>
+
+    <script>
+        const daysEN = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+        const daysDE = ['Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag', 'Sonntag'];
+        const monthsEN = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+        const monthsDE = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'];
+
+        const iconSpeaker = `<svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 sm:h-8 sm:w-8 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M11 5L6 9H2v6h4l5 4V5z" /></svg>`;
+
+        // Structure des manches
+        const roundsData = [
+            {
+                title: "🇬🇧 Écoute et lis (Anglais)",
+                subtitle: "Jours de la semaine : Relie le son au bon mot écrit.",
+                type: "audio-text",
+                langLeft: "en-GB",
+                themeLeft: "text-blue-500 bg-blue-50 border-blue-200",
+                themeRight: "text-gray-700 bg-white border-gray-200",
+                items: daysEN.map((word, index) => ({ id: index, wordLeft: word, wordRight: word }))
+            },
+            {
+                title: "🇩🇪 Écoute et lis (Allemand)",
+                subtitle: "Jours de la semaine : Relie le son au bon mot écrit.",
+                type: "audio-text",
+                langLeft: "de-DE",
+                themeLeft: "text-red-500 bg-red-50 border-red-200",
+                themeRight: "text-gray-700 bg-white border-gray-200",
+                items: daysDE.map((word, index) => ({ id: index, wordLeft: word, wordRight: word }))
+            },
+            {
+                title: "🇬🇧 ➔ 🇩🇪 Les Jumeaux (Jours)",
+                subtitle: "Trouve les traductions : Relie le mot anglais à son jumeau allemand.",
+                type: "text-text",
+                themeLeft: "text-blue-700 bg-blue-50 border-blue-200",
+                themeRight: "text-red-700 bg-red-50 border-red-200",
+                items: daysEN.map((word, index) => ({ id: index, wordLeft: word, wordRight: daysDE[index] }))
+            },
+            {
+                title: "🇬🇧 ➔ 🇩🇪 Les Jumeaux (Mois)",
+                subtitle: "Défi final : Relie les 12 mois anglais à leurs jumeaux allemands !",
+                type: "text-text",
+                themeLeft: "text-blue-700 bg-blue-50 border-blue-200 text-sm sm:text-base p-2",
+                themeRight: "text-red-700 bg-red-50 border-red-200 text-sm sm:text-base p-2",
+                items: monthsEN.map((word, index) => ({ id: index, wordLeft: word, wordRight: monthsDE[index] }))
+            }
+        ];
+
+        let currentRoundIndex = 0;
+        let leftItems = [];
+        let rightItems = [];
+        let selectedLeft = null;
+        let selectedRight = null;
+        let matchedPairs = 0;
+        let isProcessing = false; // Bloque les clics pendant l'animation d'erreur
+
+        const colLeftEl = document.getElementById('col-left');
+        const colRightEl = document.getElementById('col-right');
+        const titleEl = document.getElementById('round-title');
+        const subtitleEl = document.getElementById('round-subtitle');
+        const indicatorEl = document.getElementById('round-indicator');
+        const progressBarEl = document.getElementById('progress-bar');
+        const roundModal = document.getElementById('round-modal');
+        const victoryModal = document.getElementById('victory-modal');
+
+        function initRound() {
+            const currentRound = roundsData[currentRoundIndex];
+            titleEl.innerText = currentRound.title;
+            subtitleEl.innerText = currentRound.subtitle;
+            indicatorEl.innerText = currentRoundIndex + 1;
+            matchedPairs = 0;
+            updateProgress();
+
+            // Création et mélange indépendant des deux colonnes
+            leftItems = currentRound.items.map(item => ({ id: item.id, word: item.wordLeft }));
+            rightItems = currentRound.items.map(item => ({ id: item.id, word: item.wordRight }));
+
+            shuffleArray(leftItems);
+            shuffleArray(rightItems);
+
+            renderBoard();
+        }
+
+        function shuffleArray(array) {
+            for (let i = array.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [array[i], array[j]] = [array[j], array[i]];
+            }
+        }
+
+        function renderBoard() {
+            colLeftEl.innerHTML = '';
+            colRightEl.innerHTML = '';
+            const currentRound = roundsData[currentRoundIndex];
+            
+            // Hauteur dynamique selon le nombre d'éléments (pour que les 12 mois rentrent bien)
+            const btnHeight = currentRound.items.length > 7 ? 'h-10 sm:h-12' : 'h-14 sm:h-16';
+
+            leftItems.forEach(item => {
+                const btn = document.createElement('button');
+                btn.className = `game-btn w-full ${btnHeight} rounded-xl border-2 font-black flex items-center justify-center shadow-sm hover:shadow-md cursor-pointer ${currentRound.themeLeft}`;
+                btn.dataset.id = item.id;
+                btn.dataset.side = 'left';
+                
+                if (currentRound.type === 'audio-text') {
+                    btn.innerHTML = iconSpeaker;
+                    btn.onclick = () => handleSelection(btn, item.word, currentRound.langLeft);
+                } else {
+                    btn.innerText = item.word;
+                    btn.onclick = () => handleSelection(btn);
+                }
+                colLeftEl.appendChild(btn);
+            });
+
+            rightItems.forEach(item => {
+                const btn = document.createElement('button');
+                btn.className = `game-btn w-full ${btnHeight} rounded-xl border-2 font-black flex items-center justify-center shadow-sm hover:shadow-md cursor-pointer ${currentRound.themeRight}`;
+                btn.dataset.id = item.id;
+                btn.dataset.side = 'right';
+                btn.innerText = item.word;
+                btn.onclick = () => handleSelection(btn);
+                colRightEl.appendChild(btn);
+            });
+        }
+
+        function handleSelection(btn, wordToSpeak = null, lang = null) {
+            if (isProcessing || btn.classList.contains('matched')) return;
+
+            const side = btn.dataset.side;
+
+            // Lecture audio si c'est un bouton de la colonne gauche en manche audio
+            if (wordToSpeak && lang) {
+                playSound(wordToSpeak, lang);
+            }
+
+            if (side === 'left') {
+                if (selectedLeft) selectedLeft.classList.remove('selected');
+                selectedLeft = btn;
+                btn.classList.add('selected');
+            } else {
+                if (selectedRight) selectedRight.classList.remove('selected');
+                selectedRight = btn;
+                btn.classList.add('selected');
+            }
+
+            // Vérification si deux boutons sont sélectionnés
+            if (selectedLeft && selectedRight) {
+                checkMatch();
+            }
+        }
+
+        function playSound(text, lang) {
+            if ('speechSynthesis' in window) {
+                window.speechSynthesis.cancel();
+                const utterance = new SpeechSynthesisUtterance(text);
+                utterance.lang = lang;
+                utterance.rate = 0.9;
+                window.speechSynthesis.speak(utterance);
+            }
+        }
+
+        function checkMatch() {
+            isProcessing = true;
+            const idLeft = selectedLeft.dataset.id;
+            const idRight = selectedRight.dataset.id;
+
+            if (idLeft === idRight) {
+                // Succès
+                setTimeout(() => {
+                    selectedLeft.classList.remove('selected');
+                    selectedRight.classList.remove('selected');
+                    selectedLeft.classList.add('matched');
+                    selectedRight.classList.add('matched');
+                    
+                    selectedLeft = null;
+                    selectedRight = null;
+                    matchedPairs++;
+                    updateProgress();
+                    isProcessing = false;
+
+                    const currentRound = roundsData[currentRoundIndex];
+                    if (matchedPairs === currentRound.items.length) {
+                        setTimeout(handleRoundEnd, 600);
+                    }
+                }, 300);
+            } else {
+                // Erreur
+                selectedLeft.classList.add('error-shake');
+                selectedRight.classList.add('error-shake');
+                
+                setTimeout(() => {
+                    if (selectedLeft) {
+                        selectedLeft.classList.remove('selected', 'error-shake');
+                        selectedLeft = null;
+                    }
+                    if (selectedRight) {
+                        selectedRight.classList.remove('selected', 'error-shake');
+                        selectedRight = null;
+                    }
+                    isProcessing = false;
+                }, 500);
+            }
+        }
+
+        function updateProgress() {
+            const currentRound = roundsData[currentRoundIndex];
+            const percentage = (matchedPairs / currentRound.items.length) * 100;
+            progressBarEl.style.width = `${percentage}%`;
+        }
+
+        function handleRoundEnd() {
+            if (currentRoundIndex < roundsData.length - 1) {
+                roundModal.classList.remove('hidden');
+                roundModal.classList.add('flex');
+            } else {
+                victoryModal.classList.remove('hidden');
+                victoryModal.classList.add('flex');
+            }
+        }
+
+        document.getElementById('next-round-btn').addEventListener('click', () => {
+            roundModal.classList.add('hidden');
+            roundModal.classList.remove('flex');
+            currentRoundIndex++;
+            initRound();
+        });
+
+        function finishLevel() {
+            // Débloque le niveau 3 dans le localStorage
+            localStorage.setItem('timofy_progress', '3');
+            window.location.href = 'index.html';
+        }
+
+        // Lancement initial
+        window.onload = initRound;
+
+    </script>
+</body>
+</html>
