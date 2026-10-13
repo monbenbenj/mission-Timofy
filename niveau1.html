@@ -19,7 +19,6 @@
             flex-direction: column;
         }
 
-        /* Classes pour l'animation 3D du Memory */
         .perspective {
             perspective: 1000px;
         }
@@ -37,7 +36,6 @@
             transition: transform 0.6s cubic-bezier(0.4, 0.2, 0.2, 1);
         }
         
-        /* Grilles adaptatives selon le nombre de cartes */
         .grid-14 {
             display: grid;
             grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -45,19 +43,18 @@
         }
         @media (min-width: 640px) {
             .grid-14 { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1rem; }
-            .grid-14 > :nth-last-child(-n+2):nth-child(4n+1) { grid-column: span 2 / span 2; justify-self: center; width: 50%; } /* Center last row if odd */
+            .grid-14 > :nth-last-child(-n+2):nth-child(4n+1) { grid-column: span 2 / span 2; justify-self: center; width: 50%; }
         }
         
-        .grid-24 {
+        .grid-16 {
             display: grid;
             grid-template-columns: repeat(4, minmax(0, 1fr));
             gap: 0.5rem;
         }
         @media (min-width: 640px) {
-            .grid-24 { grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 1rem; }
+            .grid-16 { gap: 1rem; }
         }
 
-        /* Animation d'apparition de la modale */
         @keyframes popIn {
             0% { transform: scale(0.9); opacity: 0; }
             100% { transform: scale(1); opacity: 1; }
@@ -68,12 +65,12 @@
 
         @keyframes match-disappear {
             0% { transform: scale(1); opacity: 1; }
-            40% { transform: scale(1.1); opacity: 1; } /* Petit rebond avant de disparaître */
+            40% { transform: scale(1.1); opacity: 1; }
             100% { transform: scale(0); opacity: 0; }
         }
         .matched-out {
             animation: match-disappear 0.6s forwards cubic-bezier(0.4, 0, 0.2, 1);
-            pointer-events: none; /* Désactive les clics sur l'espace vide */
+            pointer-events: none;
         }
     </style>
 </head>
@@ -93,7 +90,6 @@
                 </button>
             </div>
         </div>
-        <!-- Barre de progression de la manche -->
         <div class="max-w-4xl mx-auto mt-3 bg-gray-200 rounded-full h-2.5 overflow-hidden">
             <div id="progress-bar" class="bg-green-500 h-2.5 rounded-full w-0 transition-all duration-500"></div>
         </div>
@@ -105,7 +101,6 @@
                 Les Jours (Anglais)
             </h2>
             
-            <!-- Nouvelle Jauge de concentration -->
             <div class="max-w-md mx-auto mb-6">
                 <div class="flex justify-between text-xs font-bold text-gray-500 mb-1 px-1">
                     <span>Concentration</span>
@@ -116,18 +111,15 @@
                 </div>
             </div>
             
-            <!-- Le plateau de jeu (le conteneur sera rempli par JS) -->
             <div id="game-board" class="w-full mx-auto"></div>
         </div>
     </main>
 
-    <!-- Modale de fin de manche -->
     <div id="round-modal" class="fixed inset-0 bg-gray-900/60 backdrop-blur-sm hidden items-center justify-center z-50 p-4">
         <div class="bg-white rounded-3xl p-8 max-w-sm w-full text-center shadow-2xl animate-pop">
             <div class="text-6xl mb-4">🌟</div>
             <h3 class="text-2xl font-black text-gray-800 mb-2">Superbe Timofy !</h3>
             <p class="text-gray-600 mb-4 font-bold">Manche terminée avec succès.</p>
-            <!-- Nouveau paragraphe pour le message personnalisé -->
             <p id="round-feedback" class="text-sm px-4 py-2 rounded-xl mb-6 font-bold"></p>
             <button id="next-round-btn" class="w-full bg-blue-500 text-white font-black py-4 rounded-xl shadow-lg hover:bg-blue-600 hover:-translate-y-1 transition-all">
                 Manche Suivante 🚀
@@ -135,13 +127,11 @@
         </div>
     </div>
 
-    <!-- Modale de victoire finale -->
     <div id="victory-modal" class="fixed inset-0 bg-gray-900/80 backdrop-blur-md hidden items-center justify-center z-50 p-4">
         <div class="bg-gradient-to-br from-white to-gray-50 rounded-3xl p-8 max-w-md w-full text-center shadow-2xl animate-pop border-4 border-yellow-400">
             <div class="text-7xl mb-4 animate-bounce">🏆</div>
             <h3 class="text-3xl font-black text-gray-800 mb-2">Niveau Validé Timofy !</h3>
             <p class="text-gray-600 mb-4 font-bold text-lg">Ton oreille est parfaitement aiguisée. Tu peux passer au niveau des Jumeaux !</p>
-            <!-- Nouveau paragraphe pour le message personnalisé final -->
             <p id="victory-feedback" class="text-sm px-4 py-2 rounded-xl mb-8 font-bold border-2"></p>
             <button onclick="finishLevel()" class="w-full bg-gradient-to-r from-green-400 to-green-600 text-white font-black text-xl py-4 rounded-xl shadow-xl hover:shadow-2xl hover:scale-105 transition-all">
                 Retour au Menu Principal
@@ -150,29 +140,27 @@
     </div>
 
     <script>
-        // Données du jeu
         const daysEN = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
         const daysDE = ['Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag', 'Sonntag'];
         const monthsEN = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
         const monthsDE = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'];
 
-        // Configuration des 4 manches
         const roundsData = [
             {
                 title: "🇬🇧 Les Jours (Anglais)",
                 langCode: "en-GB",
-                themeClass: "from-blue-400 to-blue-600", // Thème Anglais (Bleu)
+                themeClass: "from-blue-400 to-blue-600",
                 label: "week",
                 items: daysEN.map((word, index) => ({ word, val: index + 1 })),
-                gridClass: "grid-14" // 14 cartes (7 paires)
+                gridClass: "grid-14" // 14 cartes
             },
             {
                 title: "🇩🇪 Les Jours (Allemand)",
                 langCode: "de-DE",
-                themeClass: "from-red-500 via-red-400 to-yellow-400", // Thème Allemand (Rouge/Jaune)
+                themeClass: "from-red-500 via-red-400 to-yellow-400",
                 label: "Woche",
                 items: daysDE.map((word, index) => ({ word, val: index + 1 })),
-                gridClass: "grid-14"
+                gridClass: "grid-14" // 14 cartes
             },
             {
                 title: "🇬🇧 Les Mois (Anglais)",
@@ -180,7 +168,7 @@
                 themeClass: "from-blue-400 to-blue-600",
                 label: "month",
                 items: monthsEN.map((word, index) => ({ word, val: index + 1 })),
-                gridClass: "grid-24" // 24 cartes (12 paires)
+                gridClass: "grid-16" // 16 cartes max
             },
             {
                 title: "🇩🇪 Les Mois (Allemand)",
@@ -188,7 +176,7 @@
                 themeClass: "from-red-500 via-red-400 to-yellow-400",
                 label: "Monat",
                 items: monthsDE.map((word, index) => ({ word, val: index + 1 })),
-                gridClass: "grid-24"
+                gridClass: "grid-16" // 16 cartes max
             }
         ];
 
@@ -198,10 +186,9 @@
         let secondCard = null;
         let lockBoard = false;
         let matchedPairs = 0;
-        
-        // Nouvelles variables pour la gestion des tentatives
+        let totalPairs = 0;
         let attemptsCount = 0;
-        let maxYellowZone = 0; // Limite avant de passer dans le rouge (barre à 0%)
+        let maxYellowZone = 0;
 
         const boardEl = document.getElementById('game-board');
         const titleEl = document.getElementById('round-title');
@@ -214,24 +201,21 @@
         const roundFeedbackEl = document.getElementById('round-feedback');
         const victoryFeedbackEl = document.getElementById('victory-feedback');
 
-        // Icônes SVG
         const iconSpeaker = `<svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M11 5L6 9H2v6h4l5 4V5z" /></svg>`;
         const iconQuestion = `<svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 text-white opacity-80" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>`;
 
         let synth;
-        // Le navigateur a besoin d'une interaction utilisateur (clic) pour autoriser le son
         window.addEventListener('click', async () => {
             if (!synth) {
                 await Tone.start();
                 synth = new Tone.PolySynth(Tone.Synth).toDestination();
-                synth.volume.value = -12; // Volume modéré pour ne pas faire sursauter
+                synth.volume.value = -12;
             }
         }, { once: true });
 
         function playSuccessSound() {
             if (synth) {
                 const now = Tone.now();
-                // Joue un petit arpège rapide de victoire (Do - Mi - Sol)
                 synth.triggerAttackRelease("C5", "16n", now);
                 synth.triggerAttackRelease("E5", "16n", now + 0.1);
                 synth.triggerAttackRelease("G5", "8n", now + 0.2);
@@ -244,24 +228,29 @@
             indicatorEl.innerText = currentRoundIndex + 1;
             boardEl.className = currentRound.gridClass;
             
-            // Réinitialisation des compteurs et de la barre
+            let roundItems = [...currentRound.items];
+            
+            // Logique de réduction à 16 cartes pour les mois
+            if (roundItems.length > 7) {
+                roundItems = roundItems.sort(() => 0.5 - Math.random()).slice(0, 8);
+            }
+            
+            totalPairs = roundItems.length;
             matchedPairs = 0;
             attemptsCount = 0;
             
-            // Définition de la limite rouge selon la taille de la grille (14 ou 24 cartes)
-            if (currentRound.items.length === 7) {
-                maxYellowZone = 18; // Zone rouge à 19
+            // Calcul du seuil de la zone jaune/rouge en fonction du nombre de cartes
+            if (totalPairs === 7) {
+                maxYellowZone = 18; 
             } else {
-                maxYellowZone = 30; // Zone rouge à 31
+                maxYellowZone = 20; 
             }
             
             updateConcentrationBar();
             updateProgress();
 
-            // Création des paires de cartes (Type A: Son, Type B: Sens)
             cardsArray = [];
-            currentRound.items.forEach(item => {
-                // Carte Son (Audio uniquement)
+            roundItems.forEach(item => {
                 cardsArray.push({
                     type: 'audio',
                     val: item.val,
@@ -269,7 +258,6 @@
                     lang: currentRound.langCode,
                     theme: currentRound.themeClass
                 });
-                // Carte Sens (Visuel uniquement)
                 cardsArray.push({
                     type: 'meaning',
                     val: item.val,
@@ -277,7 +265,7 @@
                 });
             });
 
-            // Mélange de Fisher-Yates
+            // Mélange Fisher-Yates
             for (let i = cardsArray.length - 1; i > 0; i--) {
                 const j = Math.floor(Math.random() * (i + 1));
                 [cardsArray[i], cardsArray[j]] = [cardsArray[j], cardsArray[i]];
@@ -291,22 +279,18 @@
             
             cardsArray.forEach((cardData, index) => {
                 const cardWrapper = document.createElement('div');
-                // Hauteur responsive adaptée au nombre de cartes
-                cardWrapper.className = `perspective cursor-pointer ${currentRoundIndex >= 2 ? 'h-24 sm:h-32' : 'h-32 sm:h-40'}`;
+                cardWrapper.className = `perspective cursor-pointer ${totalPairs === 8 ? 'h-24 sm:h-32' : 'h-32 sm:h-40'}`;
                 cardWrapper.dataset.index = index;
                 cardWrapper.addEventListener('click', flipCard);
 
-                // Contenu HTML de la carte (Structure 3D)
                 let frontFace, backFace;
 
-                // Face cachée (par défaut)
                 frontFace = `
                     <div class="absolute w-full h-full backface-hidden bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl shadow-md border-4 border-white/20 flex items-center justify-center">
                         ${iconQuestion}
                     </div>
                 `;
 
-                // Face dévoilée
                 if (cardData.type === 'audio') {
                     backFace = `
                         <div class="absolute w-full h-full backface-hidden rotate-y-180 bg-gradient-to-br ${cardData.theme} rounded-2xl shadow-xl flex items-center justify-center ring-2 ring-white/50">
@@ -339,27 +323,21 @@
             const cardData = cardsArray[index];
             const inner = this.querySelector('.card-inner');
 
-            // Si carte déjà retournée ou matchée, on ignore
             if (inner.classList.contains('rotate-y-180')) return;
 
-            // Retournement visuel
             inner.classList.add('rotate-y-180');
 
-            // Lecture audio si c'est une carte Son
             if (cardData.type === 'audio') {
                 playSound(cardData.word, cardData.lang);
             }
 
             if (!firstCard) {
-                // Premier clic
                 firstCard = { el: this, data: cardData };
                 return;
             }
 
-            // Deuxième clic
             secondCard = { el: this, data: cardData };
             
-            // On incrémente le nombre de tentatives (1 paire retournée = 1 tentative)
             attemptsCount++;
             updateConcentrationBar();
             
@@ -367,21 +345,16 @@
         }
 
         function playSound(text, lang) {
-            // Utilisation de l'API SpeechSynthesis
             if ('speechSynthesis' in window) {
-                window.speechSynthesis.cancel(); // Coupe le son précédent si clics rapides
+                window.speechSynthesis.cancel(); 
                 const utterance = new SpeechSynthesisUtterance(text);
                 utterance.lang = lang;
-                utterance.rate = 0.9; // Légèrement ralenti pour la compréhension
+                utterance.rate = 0.9; 
                 window.speechSynthesis.speak(utterance);
             }
         }
 
         function checkForMatch() {
-            // Un match est validé si les DEUX cartes ont la même valeur (val)
-            // ET si elles sont de types différents (une audio, une meaning).
-            // (La vérification du type empêche de matcher deux cartes audio si on trichait, bien que notre grille ait généré 1 audio/1 meaning exact par paire)
-            
             let isMatch = (firstCard.data.val === secondCard.data.val) && (firstCard.data.type !== secondCard.data.type);
 
             if (isMatch) {
@@ -392,37 +365,30 @@
         }
 
         function disableCards() {
-            // On sauvegarde les éléments pour les manipuler en toute sécurité dans le setTimeout
             const el1 = firstCard.el;
             const el2 = secondCard.el;
 
             if (el1) el1.removeEventListener('click', flipCard);
             if (el2) el2.removeEventListener('click', flipCard);
             
-            // On joue le petit jingle musical !
             playSuccessSound();
             
-            // Effet visuel : Les cartes disparaissent après un court délai
             setTimeout(() => {
                 if (el1) el1.classList.add('matched-out');
                 if (el2) el2.classList.add('matched-out');
-            }, 600); // 600ms permet à Timofy de bien voir la paire qu'il a trouvée
+            }, 600); 
 
             matchedPairs++;
             updateProgress();
             resetBoard();
 
-            // Vérification de la fin de la manche
-            const currentRound = roundsData[currentRoundIndex];
-            if (matchedPairs === currentRound.items.length) {
-                // On attend que la dernière animation de disparition soit finie avant d'afficher le menu
+            if (matchedPairs === totalPairs) {
                 setTimeout(handleRoundEnd, 1200);
             }
         }
 
         function unflipCards() {
             lockBoard = true;
-            // On recache après 1.2s pour laisser le temps d'entendre/voir
             setTimeout(() => {
                 if (firstCard && firstCard.el) {
                     firstCard.el.querySelector('.card-inner').classList.remove('rotate-y-180');
@@ -439,66 +405,44 @@
         }
 
         function updateProgress() {
-            const currentRound = roundsData[currentRoundIndex];
-            const percentage = (matchedPairs / currentRound.items.length) * 100;
+            const percentage = (matchedPairs / totalPairs) * 100;
             progressBarEl.style.width = `${percentage}%`;
         }
         
         function updateConcentrationBar() {
             attemptsCounterEl.innerText = `${attemptsCount} tentative${attemptsCount > 1 ? 's' : ''}`;
             
-            // Calcul du pourcentage restant (100% au début, 0% quand on atteint maxYellowZone)
-            // Si attemptsCount > maxYellowZone, le pourcentage sera bloqué à 0
             let percentage = Math.max(0, 100 - ((attemptsCount / maxYellowZone) * 100));
-            
             concentrationBarEl.style.width = `${percentage}%`;
             
-            // Logique des couleurs de la barre (Vert -> Jaune -> Rouge)
             let color = "";
-            let currentItems = roundsData[currentRoundIndex].items.length;
-            
-            // Grille de 14 cartes (7 paires)
-            if (currentItems === 7) {
-                if (attemptsCount <= 12) color = "#22c55e"; // Vert (Tailwind green-500)
-                else if (attemptsCount <= 18) color = "#eab308"; // Jaune (Tailwind yellow-500)
-                else color = "#ef4444"; // Rouge (Tailwind red-500)
-            } 
-            // Grille de 24 cartes (12 paires)
-            else {
-                if (attemptsCount <= 20) color = "#22c55e"; // Vert
-                else if (attemptsCount <= 30) color = "#eab308"; // Jaune
-                else color = "#ef4444"; // Rouge
+            if (totalPairs === 7) { // 14 cartes
+                if (attemptsCount <= 12) color = "#22c55e"; 
+                else if (attemptsCount <= 18) color = "#eab308"; 
+                else color = "#ef4444"; 
+            } else { // 16 cartes
+                if (attemptsCount <= 14) color = "#22c55e"; 
+                else if (attemptsCount <= 20) color = "#eab308"; 
+                else color = "#ef4444"; 
             }
             
             concentrationBarEl.style.backgroundColor = color;
         }
         
         function getFeedbackData() {
-            let currentItems = roundsData[currentRoundIndex].items.length;
             let theme = { bg: "", text: "", message: "" };
-            
-            if (currentItems === 7) {
-                if (attemptsCount <= 12) {
-                    theme.bg = "bg-green-100"; theme.text = "text-green-700";
-                    theme.message = "Et quelle mémoire visuelle, tu as été super rapide !";
-                } else if (attemptsCount <= 18) {
-                    theme.bg = "bg-yellow-100"; theme.text = "text-yellow-700";
-                    theme.message = "Essaie de faire un peu moins de tentatives à la manche suivante pour tester ta mémoire.";
-                } else {
-                    theme.bg = "bg-red-100"; theme.text = "text-red-700";
-                    theme.message = "Oups, tu as utilisé beaucoup de tentatives ! Prends ton temps pour bien mémoriser les cartes la prochaine fois.";
-                }
+            let greenLimit = totalPairs === 7 ? 12 : 14;
+            let yellowLimit = totalPairs === 7 ? 18 : 20;
+
+            if (attemptsCount <= greenLimit) {
+                theme.bg = "bg-green-100"; theme.text = "text-green-700";
+                theme.message = "Et quelle mémoire visuelle, tu as été super rapide !";
+            } else if (attemptsCount <= yellowLimit) {
+                theme.bg = "bg-yellow-100"; theme.text = "text-yellow-700";
+                theme.message = "Essaie de faire un peu moins de tentatives à la manche suivante pour tester ta mémoire.";
             } else {
-                if (attemptsCount <= 20) {
-                    theme.bg = "bg-green-100"; theme.text = "text-green-700";
-                    theme.message = "Et quelle mémoire visuelle, tu as été super rapide !";
-                } else if (attemptsCount <= 30) {
-                    theme.bg = "bg-yellow-100"; theme.text = "text-yellow-700";
-                    theme.message = "Essaie de faire un peu moins de tentatives à la manche suivante pour tester ta mémoire.";
-                } else {
-                    theme.bg = "bg-red-100"; theme.text = "text-red-700";
-                    theme.message = "Oups, tu as utilisé beaucoup de tentatives ! Prends ton temps pour bien mémoriser les cartes la prochaine fois.";
-                }
+                theme.bg = "bg-red-100"; theme.text = "text-red-700";
+                theme.message = "Oups, tu as utilisé beaucoup de tentatives ! Prends ton temps pour bien mémoriser les cartes la prochaine fois.";
             }
             return theme;
         }
@@ -507,14 +451,12 @@
             const feedback = getFeedbackData();
             
             if (currentRoundIndex < roundsData.length - 1) {
-                // Configurer le message pour la modale de manche
                 roundFeedbackEl.className = `text-sm px-4 py-2 rounded-xl mb-6 font-bold ${feedback.bg} ${feedback.text}`;
                 roundFeedbackEl.innerText = feedback.message;
                 
                 roundModal.classList.remove('hidden');
                 roundModal.classList.add('flex');
             } else {
-                // Configurer le message pour la modale finale
                 victoryFeedbackEl.className = `text-sm px-4 py-2 rounded-xl mb-8 font-bold border-2 ${feedback.bg} ${feedback.text} border-${feedback.text.split('-')[1]}-200`;
                 victoryFeedbackEl.innerText = feedback.message;
                 
@@ -531,20 +473,12 @@
         });
 
         function finishLevel() {
-            // Sauvegarde de la progression pour le menu principal
-            // 'timofy_progress' à 2 signifie que le Niveau 2 est débloqué dans index.html
             localStorage.setItem('timofy_progress', '2');
-            
-            // Sécurité additionnelle requise dans le prompt
             localStorage.setItem('niveau2_unlocked', 'true');
-            
-            // Retour au menu
             window.location.href = 'index.html';
         }
 
-        // Lancement de la première manche au chargement
         window.onload = initRound;
-
     </script>
 </body>
 </html>
